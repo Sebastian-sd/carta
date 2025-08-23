@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
   <title>Carta Villa Grill • Pedidos</title>
   <style>
     :root{--bg:#0b1220;--card:#0f172a;--muted:#94a3b8;--text:#e5e7eb;--brand:#22c55e;--border:#213043}
@@ -31,16 +31,17 @@
     small.muted{color:var(--muted)}
     #registro{max-height:300px;overflow:auto;margin-top:16px;padding:6px;border:1px solid var(--border);border-radius:10px;background:#0e1628}
     #registro .pedido{border-bottom:1px solid #1f2937;padding:6px 0}
-    /* Modal de personalización */
+    /* Modal */
     .modal{position:fixed;inset:0;background:#0009;display:none;align-items:center;justify-content:center;padding:16px}
     .modal.show{display:flex}
-    .modal .box{width:min(700px,100%);background:#0e1628;border:1px solid var(--border);border-radius:16px;padding:14px;box-shadow:0 20px 60px #000a}
+    .modal .box{position:relative;display:flex;flex-direction:column;width:min(700px,100%);max-height:90vh;overflow-y:auto;background:#0e1628;border:1px solid var(--border);border-radius:16px;padding:14px;box-shadow:0 20px 60px #000a}
     .modal h3{margin:0 0 6px 0}
     .opts{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin:8px 0}
     .opt{display:flex;align-items:center;gap:10px;border:1px solid var(--border);border-radius:12px;padding:8px;background:#0b1220}
     .sw{width:18px;height:18px;border-radius:999px;border:1px solid #0003}
-    .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}
+    .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:auto;position:sticky;bottom:0;background:#0e1628;padding-top:8px}
     textarea{width:100%;min-height:60px;border:1px solid var(--border);background:#0b1220;color:#e5e7eb;border-radius:12px;padding:8px;resize:vertical}
+    .close-btn{position:absolute;top:8px;right:12px;background:none;border:none;font-size:20px;color:#cbd5e1;cursor:pointer}
     @media (max-width:960px){.grid{grid-template-columns:1fr}}
   </style>
 </head>
@@ -99,6 +100,7 @@
 <!-- Modal de personalización -->
 <div id="modal" class="modal" aria-hidden="true">
   <div class="box">
+    <button class="close-btn" id="cerrarModal">✕</button>
     <h3 id="modalTitle">Personalizar</h3>
     <div id="modalBody"></div>
     <div class="actions">
@@ -112,6 +114,7 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import { getDatabase, ref, push, onChildAdded, onChildChanged, update } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
+  // 🔑 PON AQUÍ TU API KEY REAL
   const firebaseConfig = {
     apiKey: "TU_API_KEY",
     authDomain: "parrillas-66b0e.firebaseapp.com",
@@ -121,13 +124,15 @@
     messagingSenderId: "520361790818",
     appId: "1:520361790818:web:36b65573eabde389c9f03b"
   };
+
   const app = initializeApp(firebaseConfig);
   const db = getDatabase(app);
-  const $ = s=>document.querySelector(s);
-  const menuEl=$('#menu'),buscarEl=$('#buscar'),catEl=$('#categoria'),itemsCount=$('#itemsCount');
-  const carritoEl=$('#carrito'),carritoVacio=$('#carritoVacio'),totalEl=$('#total'),enviarBtn=$('#enviar');
-  const status=$('#status'),registroEl=$('#registro');
+  const $ = s => document.querySelector(s);
+  const menuEl=$('#menu'), buscarEl=$('#buscar'), catEl=$('#categoria'), itemsCount=$('#itemsCount');
+  const carritoEl=$('#carrito'), carritoVacio=$('#carritoVacio'), totalEl=$('#total'), enviarBtn=$('#enviar');
+  const status=$('#status'), registroEl=$('#registro');
 
+  // --- Carta ---
   const CARTA=[
     {id:'hamb_carne',cat:'hamburguesas',nombre:'Hamburguesa de Carne',precio:10,desc:'Carne, papas y ensalada',opciones:{cremas:['Mayonesa','Ketchup','Mostaza','Aceituna','Aji','Tartara','Salsa Golf','Chimichurri'],papas:['frita','hilo','mixtas'],ensalada:['lechuga','tomate','completo','sin ensalada']}},
     {id:'hamb_royal_carne',cat:'hamburguesas',nombre:'Hamburguesa Royal Carne',precio:13,desc:'Carne, huevo, queso, papas y ensalada',opciones:{cremas:['Mayonesa','Ketchup','Mostaza','Aceituna','Aji','Tartara','Salsa Golf','Chimichurri'],papas:['frita','hilo','mixtas'],ensalada:['lechuga','tomate','completo','sin ensalada']}},
@@ -143,26 +148,24 @@
     {id:'costillar_cordero',cat:'parrillas',nombre:'Costillar de Cordero',precio:36,desc:'6 tiras, choclo, ensalada, chorizo'}
   ];
 
-  const cremaColors={
-    'Mayonesa':'#fff8db','Ketchup':'#c81d25','Mostaza':'#f59e0b','Aceituna':'#6b7280','Aji':'#ef4444','Tartara':'#e5e7eb','Salsa Golf':'#fbbf24','Chimichurri':'#16a34a'
-  };
+  const cremaColors={'Mayonesa':'#fff8db','Ketchup':'#c81d25','Mostaza':'#f59e0b','Aceituna':'#6b7280','Aji':'#ef4444','Tartara':'#e5e7eb','Salsa Golf':'#fbbf24','Chimichurri':'#16a34a'};
 
   const cart=[];
 
   function pintarMenu(){
-    const q=(buscarEl.value||'').toLowerCase();const cat=catEl.value;
+    const q=(buscarEl.value||'').toLowerCase(); const cat=catEl.value;
     const data=CARTA.filter(x=>(!cat||x.cat===cat)&&(x.nombre.toLowerCase().includes(q)||x.cat.includes(q)));
     itemsCount.textContent=`${data.length} ítems`;
-    menuEl.innerHTML=data.map(x=>`<div class=item>
-      <div class=row style="justify-content:space-between">
+    menuEl.innerHTML=data.map(x=>`<div class="item">
+      <div class="row" style="justify-content:space-between">
         <h3>${x.nombre}</h3>
-        <span class=price>S/ ${x.precio.toFixed(2)}</span>
+        <span class="price">S/ ${x.precio.toFixed(2)}</span>
       </div>
-      ${x.desc?`<small class=muted>${x.desc}</small>`:''}
-      ${x.opciones?'<small class=muted>Incluye opciones</small>':'<small class=muted>Solo cantidad</small>'}
-      <div class=row>
-        <button data-id=${x.id} class=add>Agregar</button>
-        <button data-id=${x.id} class="custom ghost">Personalizar</button>
+      ${x.desc?`<small class="muted">${x.desc}</small>`:''}
+      ${x.opciones?'<small class="muted">Incluye opciones</small>':'<small class="muted">Solo cantidad</small>'}
+      <div class="row">
+        <button data-id="${x.id}" class="add">Agregar</button>
+        <button data-id="${x.id}" class="custom ghost">Personalizar</button>
       </div>
     </div>`).join('');
     menuEl.querySelectorAll('button.add').forEach(b=>b.onclick=()=>agregar(b.dataset.id));
@@ -171,11 +174,9 @@
 
   function agregar(id,custom={}){
     const it=CARTA.find(i=>i.id===id);
-    cart.push({
-      id:it.id,nombre:it.nombre,precio:it.precio,
+    cart.push({ id:it.id,nombre:it.nombre,precio:it.precio,
       cremas:custom.cremas||null,papas:custom.papas||null,ensalada:custom.ensalada||null,
-      detCremas:custom.detCremas||null,detPapas:custom.detPapas||null,
-      ts:Date.now()
+      detCremas:custom.detCremas||null,detPapas:custom.detPapas||null, ts:Date.now()
     });
     pintarCarrito();
   }
@@ -224,6 +225,8 @@
 
   document.getElementById('cancelar').onclick=()=>document.getElementById('modal').classList.remove('show');
   document.getElementById('modal').addEventListener('click',e=>{ if(e.target.id==='modal') e.currentTarget.classList.remove('show'); });
+  document.getElementById('cerrarModal').onclick=()=>document.getElementById('modal').classList.remove('show');
+  window.addEventListener('keydown',e=>{ if(e.key==='Escape'){ document.getElementById('modal').classList.remove('show'); }});
 
   document.getElementById('guardarPersonalizacion').onclick=()=>{
     const modal=document.getElementById('modal');
@@ -239,20 +242,15 @@
 
   function pintarCarrito(){
     carritoEl.innerHTML='';
-    if(cart.length===0){carritoVacio.style.display='block';}else{carritoVacio.style.display='none';}
+    carritoVacio.style.display = cart.length ? 'none':'block';
     let suma=0;
     cart.forEach((l,i)=>{
       suma+=l.precio;
-      const div=document.createElement('div');
-      div.className='item';
+      const div=document.createElement('div'); div.className='item';
       const detalles=(l.cremas||l.papas||l.ensalada||l.detCremas||l.detPapas)
-        ? `<small class="muted">${l.cremas?`Cremas: ${l.cremas.join(', ')} · `:''}${l.papas?`Papas: ${l.papas} · `:''}${l.ensalada?`Ensalada: ${l.ensalada} · `:''}${l.detCremas?`Det. cremas: ${l.detCremas} · `:''}${l.detPapas?`Det. papas: ${l.detPapas}`:''}</small>`
-        : '';
-      div.innerHTML=`
-        <div class="row" style="justify-content:space-between">
-          <strong>${l.nombre}</strong>
-          <span class="price">S/ ${l.precio.toFixed(2)}</span>
-        </div>
+        ? `<small class="muted">${l.cremas?`Cremas: ${l.cremas.join(', ')} · `:''}${l.papas?`Papas: ${l.papas} · `:''}${l.ensalada?`Ensalada: ${l.ensalada} · `:''}${l.detCremas?`Det. cremas: ${l.detCremas} · `:''}${l.detPapas?`Det. papas: ${l.detPapas}`:''}</small>` : '';
+      div.innerHTML=`<div class="row" style="justify-content:space-between">
+          <strong>${l.nombre}</strong><span class="price">S/ ${l.precio.toFixed(2)}</span></div>
         ${detalles}
         <div class="row">
           <button class="ghost" data-i="${i}" data-act="dup">Duplicar</button>
@@ -261,7 +259,10 @@
       carritoEl.appendChild(div);
     });
     totalEl.textContent=`S/ ${suma.toFixed(2)}`;
-    carritoEl.querySelectorAll('button').forEach(b=>{const i=+b.dataset.i;const act=b.dataset.act;if(isNaN(i))return;b.onclick=()=>{if(act==='del')cart.splice(i,1);if(act==='dup')cart.splice(i+1,0,{...cart[i],ts:Date.now()});pintarCarrito();}})
+    carritoEl.querySelectorAll('button').forEach(b=>{
+      const i=+b.dataset.i, act=b.dataset.act; if(isNaN(i)) return;
+      b.onclick=()=>{ if(act==='del') cart.splice(i,1); if(act==='dup') cart.splice(i+1,0,{...cart[i],ts:Date.now()}); pintarCarrito(); }
+    });
   }
 
   enviarBtn.onclick=async()=>{
@@ -269,25 +270,19 @@
     const cliente=$('#cliente').value.trim();
     const pago=$('#pago').value;
     const pedido={cliente:cliente||null,pago,items:cart,total:cart.reduce((a,b)=>a+b.precio,0),ts:Date.now()};
-    try{enviarBtn.disabled=true;await push(ref(db,'pedidos'),pedido);cart.length=0;pintarCarrito();alert('✅ Pedido enviado');}catch(e){alert('Error:'+e.message);}finally{enviarBtn.disabled=false;}
+    try{enviarBtn.disabled=true;await push(ref(db,'pedidos'),pedido);cart.length=0;pintarCarrito();alert('✅ Pedido enviado');}
+    catch(e){alert('Error:'+e.message);}
+    finally{enviarBtn.disabled=false;}
   };
 
+  // Registro: render y toggle pagado/pendiente
   function renderPedido(key, p){
-    // crea o actualiza
     let div = registroEl.querySelector(`.pedido[data-key="${key}"]`);
     const d = new Date(p.ts);
     const items = (p.items||[]).map(i=>`• ${i.nombre}${i.papas?` (${i.papas})`:''}`).join('<br>');
     const pagoTxt = p.pago === 'pagado' ? 'Pagado' : 'Por pagar';
-
-    if(!div){
-      div = document.createElement('div');
-      div.className = 'pedido';
-      div.dataset.key = key;
-      registroEl.prepend(div);
-    }
-
-    div.innerHTML = `
-      <div class="row" style="justify-content:space-between;align-items:center">
+    if(!div){ div=document.createElement('div'); div.className='pedido'; div.dataset.key=key; registroEl.prepend(div); }
+    div.innerHTML = `<div class="row" style="justify-content:space-between;align-items:center">
         <div>
           <strong>${p.cliente||'Sin nombre'}</strong> — <span class="badge">${pagoTxt}</span><br>
           ${items}<br>
@@ -297,26 +292,18 @@
           <button class="ghost" data-act="toggle" data-key="${key}">${p.pago==='pagado'?'Marcar pendiente':'Marcar pagado'}</button>
         </div>
       </div>`;
-
-    const btn = div.querySelector('button[data-act="toggle"]');
-    btn.onclick = async ()=>{
+    div.querySelector('button[data-act="toggle"]').onclick = async ()=>{
       const nuevo = (p.pago === 'pagado') ? 'pendiente' : 'pagado';
       try{ await update(ref(db, `pedidos/${key}`), { pago: nuevo }); }
       catch(e){ alert('No se pudo actualizar: '+(e?.message||e)); }
     };
   }
 
-  onChildAdded(ref(db,'pedidos'), snap => {
-    status.textContent='Conectado';
-    renderPedido(snap.key, snap.val());
-  });
+  onChildAdded(ref(db,'pedidos'), snap => { status.textContent='Conectado'; renderPedido(snap.key, snap.val()); });
+  onChildChanged(ref(db,'pedidos'), snap => { renderPedido(snap.key, snap.val()); });
 
-  onChildChanged(ref(db,'pedidos'), snap => {
-    renderPedido(snap.key, snap.val());
-  });
-
-  buscarEl.oninput=pintarMenu;catEl.onchange=pintarMenu;
-  pintarMenu();pintarCarrito();
+  buscarEl.oninput=pintarMenu; catEl.onchange=pintarMenu;
+  pintarMenu(); pintarCarrito();
 </script>
 </body>
 </html>
