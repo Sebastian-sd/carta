@@ -31,15 +31,17 @@
     small.muted{color:var(--muted)}
     #registro{max-height:300px;overflow:auto;margin-top:16px;padding:6px;border:1px solid var(--border);border-radius:10px;background:#0e1628}
     #registro .pedido{border-bottom:1px solid #1f2937;padding:6px 0}
-    /* Modal */
-    .modal{position:fixed;inset:0;background:#0009;display:none;align-items:center;justify-content:center;padding:16px}
+
+    /* Modal totalmente usable en móvil */
+    .modal{position:fixed;inset:0;background:#0009;display:none;align-items:center;justify-content:center;padding:16px;overscroll-behavior:contain}
     .modal.show{display:flex}
-    .modal .box{position:relative;display:flex;flex-direction:column;width:min(700px,100%);max-height:90vh;overflow-y:auto;background:#0e1628;border:1px solid var(--border);border-radius:16px;padding:14px;box-shadow:0 20px 60px #000a}
+    .modal .box{position:relative;display:flex;flex-direction:column;width:min(700px,100%);max-height:90dvh;background:#0e1628;border:1px solid var(--border);border-radius:16px;padding:14px;box-shadow:0 20px 60px #000a}
+    .modal .scroll{overflow-y:auto;-webkit-overflow-scrolling:touch;min-height:0;padding-bottom:8px}
     .modal h3{margin:0 0 6px 0}
     .opts{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin:8px 0}
     .opt{display:flex;align-items:center;gap:10px;border:1px solid var(--border);border-radius:12px;padding:8px;background:#0b1220}
     .sw{width:18px;height:18px;border-radius:999px;border:1px solid #0003}
-    .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:auto;position:sticky;bottom:0;background:#0e1628;padding-top:8px}
+    .actions{display:flex;gap:8px;justify-content:flex-end;position:sticky;bottom:0;background:#0e1628;padding-top:8px}
     textarea{width:100%;min-height:60px;border:1px solid var(--border);background:#0b1220;color:#e5e7eb;border-radius:12px;padding:8px;resize:vertical}
     .close-btn{position:absolute;top:8px;right:12px;background:none;border:none;font-size:20px;color:#cbd5e1;cursor:pointer}
     @media (max-width:960px){.grid{grid-template-columns:1fr}}
@@ -102,7 +104,10 @@
   <div class="box">
     <button class="close-btn" id="cerrarModal">✕</button>
     <h3 id="modalTitle">Personalizar</h3>
-    <div id="modalBody"></div>
+    <!-- Contenedor scrolleable -->
+    <div id="modalScroll" class="scroll">
+      <div id="modalBody"></div>
+    </div>
     <div class="actions">
       <button class="ghost" id="cancelar">Cancelar</button>
       <button id="guardarPersonalizacion">Agregar</button>
@@ -115,15 +120,16 @@
   import { getDatabase, ref, push, onChildAdded, onChildChanged, update } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
   // 🔑 PON AQUÍ TU API KEY REAL
-  const firebaseConfig = {
-    apiKey: "TU_API_KEY",
-    authDomain: "parrillas-66b0e.firebaseapp.com",
-    databaseURL: "https://parrillas-66b0e-default-rtdb.firebaseio.com",
-    projectId: "parrillas-66b0e",
-    storageBucket: "parrillas-66b0e.appspot.com",
-    messagingSenderId: "520361790818",
-    appId: "1:520361790818:web:36b65573eabde389c9f03b"
-  };
+const firebaseConfig = {
+  apiKey: "AIzaSyC3w6KUZi0bKdSMP2f2M3ele8dLtCGpVLk",
+  authDomain: "parrillas-66b0e.firebaseapp.com",
+  databaseURL: "https://parrillas-66b0e-default-rtdb.firebaseio.com",
+  projectId: "parrillas-66b0e",
+  storageBucket: "parrillas-66b0e.firebasestorage.app",
+  messagingSenderId: "520361790818",
+  appId: "1:520361790818:web:36b65573eabde389c9f03b",
+  measurementId: "G-79700DWFFW"
+};
 
   const app = initializeApp(firebaseConfig);
   const db = getDatabase(app);
@@ -221,24 +227,17 @@
     const modal=document.getElementById('modal');
     modal.classList.add('show');
     modal.dataset.itemId=item.id;
+
+    // Enfocar primer control para habilitar teclado/scroll en móvil
+    const firstInput=document.querySelector('#modalBody input');
+    if(firstInput) setTimeout(()=>firstInput.focus(),50);
   }
 
+  // Cerrar modal
   document.getElementById('cancelar').onclick=()=>document.getElementById('modal').classList.remove('show');
-  document.getElementById('modal').addEventListener('click',e=>{ if(e.target.id==='modal') e.currentTarget.classList.remove('show'); });
   document.getElementById('cerrarModal').onclick=()=>document.getElementById('modal').classList.remove('show');
+  document.getElementById('modal').addEventListener('click',e=>{ if(e.target.id==='modal') e.currentTarget.classList.remove('show'); });
   window.addEventListener('keydown',e=>{ if(e.key==='Escape'){ document.getElementById('modal').classList.remove('show'); }});
-
-  document.getElementById('guardarPersonalizacion').onclick=()=>{
-    const modal=document.getElementById('modal');
-    const id=modal.dataset.itemId;
-    const cremas=[...document.querySelectorAll('input[name="cremas"]:checked')].map(x=>x.value);
-    const papas=(document.querySelector('input[name="papas"]:checked')||{}).value||null;
-    const ensalada=(document.querySelector('input[name="ensalada"]:checked')||{}).value||null;
-    const detCremas=document.getElementById('detCremas').value.trim()||null;
-    const detPapas=document.getElementById('detPapas').value.trim()||null;
-    agregar(id,{cremas,papas,ensalada,detCremas,detPapas});
-    modal.classList.remove('show');
-  }
 
   function pintarCarrito(){
     carritoEl.innerHTML='';
@@ -261,7 +260,7 @@
     totalEl.textContent=`S/ ${suma.toFixed(2)}`;
     carritoEl.querySelectorAll('button').forEach(b=>{
       const i=+b.dataset.i, act=b.dataset.act; if(isNaN(i)) return;
-      b.onclick=()=>{ if(act==='del') cart.splice(i,1); if(act==='dup') cart.splice(i+1,0,{...cart[i],ts:Date.now()}); pintarCarrito(); }
+      b.onclick=()=>{ if(act==='del') cart.splice(i,1); if(act==='dup') cart.splice(i+1,0,{...cart[i],ts:Date.now()}); pintarCarrito(); };
     });
   }
 
@@ -271,12 +270,11 @@
     const pago=$('#pago').value;
     const pedido={cliente:cliente||null,pago,items:cart,total:cart.reduce((a,b)=>a+b.precio,0),ts:Date.now()};
     try{enviarBtn.disabled=true;await push(ref(db,'pedidos'),pedido);cart.length=0;pintarCarrito();alert('✅ Pedido enviado');}
-    catch(e){alert('Error:'+e.message);}
-    finally{enviarBtn.disabled=false;}
+    catch(e){alert('Error:'+e.message);} finally{enviarBtn.disabled=false;}
   };
 
   // Registro: render y toggle pagado/pendiente
-  function renderPedido(key, p){
+  function renderPedido(key,p){
     let div = registroEl.querySelector(`.pedido[data-key="${key}"]`);
     const d = new Date(p.ts);
     const items = (p.items||[]).map(i=>`• ${i.nombre}${i.papas?` (${i.papas})`:''}`).join('<br>');
