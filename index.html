@@ -17,6 +17,8 @@
     .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
     .toolbar input[type="search"], .toolbar input[type="text"], select{border:1px solid var(--border);background:#0b1220;color:var(--text);border-radius:12px;padding:10px 12px;outline:none}
     .badge{padding:4px 10px;border:1px solid var(--border);border-radius:999px;color:#a5b4fc;background:#0b1220}
+    .badge.efectivo{background:#065f46;color:#bbf7d0;border-color:#065f46}
+    .badge.yape{background:#4c1d95;color:#e9d5ff;border-color:#4c1d95}
     .list{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
     .item{border:1px solid var(--border);border-radius:14px;padding:10px;background:linear-gradient(180deg,#0c1425,#0b1220);display:grid;gap:8px}
     .item h3{margin:0;font-size:16px}
@@ -26,13 +28,11 @@
     .cart{display:grid;gap:10px}
     .cart h2{margin:0 0 6px 0;font-size:18px}
     .row{display:flex;gap:8px;align-items:center}
-    .kvs{display:grid;grid-template-columns:1fr 1fr;gap:8px}
     .total{display:flex;align-items:center;justify-content:space-between;border-top:1px dashed var(--border);padding-top:8px;margin-top:6px}
     small.muted{color:var(--muted)}
     #registro{max-height:300px;overflow:auto;margin-top:16px;padding:6px;border:1px solid var(--border);border-radius:10px;background:#0e1628}
     #registro .pedido{border-bottom:1px solid #1f2937;padding:6px 0}
-
-    /* Modal totalmente usable en móvil */
+    /* Modal móvil con scroll */
     .modal{position:fixed;inset:0;background:#0009;display:none;align-items:center;justify-content:center;padding:16px;overscroll-behavior:contain}
     .modal.show{display:flex}
     .modal .box{position:relative;display:flex;flex-direction:column;width:min(700px,100%);max-height:90dvh;background:#0e1628;border:1px solid var(--border);border-radius:16px;padding:14px;box-shadow:0 20px 60px #000a}
@@ -45,6 +45,8 @@
     textarea{width:100%;min-height:60px;border:1px solid var(--border);background:#0b1220;color:#e5e7eb;border-radius:12px;padding:8px;resize:vertical}
     .close-btn{position:absolute;top:8px;right:12px;background:none;border:none;font-size:20px;color:#cbd5e1;cursor:pointer}
     @media (max-width:960px){.grid{grid-template-columns:1fr}}
+    .it{margin:4px 0}
+    .sep{border:0;border-top:1px dashed var(--border);margin:6px 0}
   </style>
 </head>
 <body>
@@ -63,10 +65,11 @@
         <option value="parrillas">Parrillas</option>
         <option value="hamburguesas">Hamburguesas</option>
         <option value="salchipapas">Salchipapas</option>
+        <option value="bebidas">Bebidas</option>
+        <option value="extras">Extras</option>
       </select>
       <span class="badge" id="itemsCount">0 ítems</span>
     </div>
-
     <div id="menu" class="list" style="margin-top:12px"></div>
     <small class="muted">* Toca «Personalizar» para elegir cremas, tipo de papas y ensalada en Hamburguesas y Salchipapas.</small>
   </section>
@@ -77,21 +80,27 @@
       <h2>Carrito</h2>
       <div id="carritoVacio" class="row"><small class="muted">Aún no hay productos. Agrega de la carta →</small></div>
       <div id="carrito"></div>
-      <div class="kvs" style="margin-top:8px">
-        <input id="cliente" type="text" placeholder="Nombre del cliente" />
-        <select id="pago">
-          <option value="pendiente">Por pagar</option>
-          <option value="pagado">Pagado</option>
-        </select>
-      </div>
       <div class="total">
-        <strong>Total: <span id="total">S/ 0.00</span></strong>
+        <input id="cliente" type="text" placeholder="Nombre del cliente" style="flex:1;margin-right:8px" />
         <button id="enviar">Enviar pedido</button>
       </div>
       <small class="muted">Los pedidos se guardan en Firebase Realtime Database.</small>
     </div>
   </aside>
 </div>
+
+<!-- Resumen del día -->
+<section class="container card section" style="margin-top:12px">
+  <h2 style="margin:0 0 8px 0">Resumen de ventas (hoy)</h2>
+  <div class="list" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px">
+    <div class="item"><strong>Pedidos</strong><div><span id="resPedidos">0</span></div></div>
+    <div class="item"><strong>Total pagado</strong><div>S/ <span id="resPagado">0.00</span></div></div>
+    <div class="item"><strong>Total pendiente</strong><div>S/ <span id="resPendiente">0.00</span></div></div>
+    <div class="item"><strong>Total del día</strong><div>S/ <span id="resTotal">0.00</span></div></div>
+    <div class="item"><strong>Efectivo (hoy)</strong><div>S/ <span id="resEfec">0.00</span></div></div>
+    <div class="item"><strong>Yape (hoy)</strong><div>S/ <span id="resYape">0.00</span></div></div>
+  </div>
+</section>
 
 <!-- Registro del día -->
 <section class="container card section" style="margin-top:12px">
@@ -102,70 +111,60 @@
 <!-- Modal de personalización -->
 <div id="modal" class="modal" aria-hidden="true">
   <div class="box">
-    <button class="close-btn" id="cerrarModal">✕</button>
+    <button class="close-btn" id="cerrarModal" type="button">✕</button>
     <h3 id="modalTitle">Personalizar</h3>
-    <!-- Contenedor scrolleable -->
-    <div id="modalScroll" class="scroll">
-      <div id="modalBody"></div>
+    <div id="modalBody" class="scroll"></div>
+    <div class="actions">
+      <button class="ghost" id="cancelar" type="button">Cancelar</button>
+      <button id="guardarPersonalizacion" type="button">Agregar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de pago -->
+<div id="payModal" class="modal" aria-hidden="true">
+  <div class="box">
+    <button class="close-btn" id="closePay" type="button">✕</button>
+    <h3>Confirmar pago</h3>
+    <div class="row" style="margin:8px 0">
+      <label for="payMetodo" style="min-width:120px">Método:</label>
+      <select id="payMetodo">
+        <option value="efectivo">Efectivo</option>
+        <option value="yape">Yape</option>
+      </select>
     </div>
     <div class="actions">
-      <button class="ghost" id="cancelar">Cancelar</button>
-      <button id="guardarPersonalizacion">Agregar</button>
+      <button class="ghost" id="cancelPay" type="button">Cancelar</button>
+      <button id="confirmPay" type="button">Guardar</button>
     </div>
   </div>
 </div>
 
 <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getDatabase, ref, push, onChildAdded, onChildChanged, update } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
-
-  // 🔑 PON AQUÍ TU API KEY REAL
-const firebaseConfig = {
-  apiKey: "AIzaSyC3w6KUZi0bKdSMP2f2M3ele8dLtCGpVLk",
-  authDomain: "parrillas-66b0e.firebaseapp.com",
-  databaseURL: "https://parrillas-66b0e-default-rtdb.firebaseio.com",
-  projectId: "parrillas-66b0e",
-  storageBucket: "parrillas-66b0e.firebasestorage.app",
-  messagingSenderId: "520361790818",
-  appId: "1:520361790818:web:36b65573eabde389c9f03b",
-  measurementId: "G-79700DWFFW"
-};
-
-  const app = initializeApp(firebaseConfig);
-  const db = getDatabase(app);
+  /* ===================== UI BÁSICA ===================== */
   const $ = s => document.querySelector(s);
   const menuEl=$('#menu'), buscarEl=$('#buscar'), catEl=$('#categoria'), itemsCount=$('#itemsCount');
-  const carritoEl=$('#carrito'), carritoVacio=$('#carritoVacio'), totalEl=$('#total'), enviarBtn=$('#enviar');
-  const status=$('#status'), registroEl=$('#registro');
-
-  // --- Carta ---
-  const CARTA=[
-    {id:'hamb_carne',cat:'hamburguesas',nombre:'Hamburguesa de Carne',precio:10,desc:'Carne, papas y ensalada',opciones:{cremas:['Mayonesa','Ketchup','Mostaza','Aceituna','Aji','Tartara','Salsa Golf','Chimichurri'],papas:['frita','hilo','mixtas'],ensalada:['lechuga','tomate','completo','sin ensalada']}},
-    {id:'hamb_royal_carne',cat:'hamburguesas',nombre:'Hamburguesa Royal Carne',precio:13,desc:'Carne, huevo, queso, papas y ensalada',opciones:{cremas:['Mayonesa','Ketchup','Mostaza','Aceituna','Aji','Tartara','Salsa Golf','Chimichurri'],papas:['frita','hilo','mixtas'],ensalada:['lechuga','tomate','completo','sin ensalada']}},
-    {id:'hamb_filete_pollo',cat:'hamburguesas',nombre:'Hamburguesa Filete de Pollo',precio:10,desc:'Filete de pollo, papas y ensalada',opciones:{cremas:['Mayonesa','Ketchup','Mostaza','Aceituna','Aji','Tartara','Salsa Golf','Chimichurri'],papas:['frita','hilo','mixtas'],ensalada:['lechuga','tomate','completo','sin ensalada']}},
-    {id:'hamb_royal_pollo',cat:'hamburguesas',nombre:'Hamburguesa Royal Pollo',precio:13,desc:'Filete de pollo, huevo, queso, papas y ensalada',opciones:{cremas:['Mayonesa','Ketchup','Mostaza','Aceituna','Aji','Tartara','Salsa Golf','Chimichurri'],papas:['frita','hilo','mixtas'],ensalada:['lechuga','tomate','completo','sin ensalada']}},
-    {id:'hamb_chorizo',cat:'hamburguesas',nombre:'Hamburguesa de Chorizo',precio:9,desc:'Chorizo, papas y ensalada',opciones:{cremas:['Mayonesa','Ketchup','Mostaza','Aceituna','Aji','Tartara','Salsa Golf','Chimichurri'],papas:['frita','hilo','mixtas'],ensalada:['lechuga','tomate','completo','sin ensalada']}},
-    {id:'hamb_cordero',cat:'hamburguesas',nombre:'Hamburguesa de Cordero',precio:13,desc:'Cordero, papas y ensalada',opciones:{cremas:['Mayonesa','Ketchup','Mostaza','Aceituna','Aji','Tartara','Salsa Golf','Chimichurri'],papas:['frita','hilo','mixtas'],ensalada:['lechuga','tomate','completo','sin ensalada']}},
-    {id:'salchi_clasica',cat:'salchipapas',nombre:'Salchipapa clásica / ahumadas',precio:10,desc:'Papa y HotDog',opciones:{cremas:['Mayonesa','Ketchup','Mostaza','Aceituna','Aji','Tartara','Salsa Golf','Chimichurri'],papas:['frita','hilo','mixtas'],ensalada:['lechuga','tomate','completo','sin ensalada']}},
-    {id:'parr_cerdo',cat:'parrillas',nombre:'Parrillada de Cerdo',precio:27,desc:'2 presas, choclo, ensalada, chorizo'},
-    {id:'parr_res',cat:'parrillas',nombre:'Parrillada de Res',precio:27,desc:'2 presas, choclo, ensalada, chorizo'},
-    {id:'parr_pollo',cat:'parrillas',nombre:'Parrillada de Pollo',precio:27,desc:'2 presas, choclo, ensalada, chorizo'},
-    {id:'parr_cordero',cat:'parrillas',nombre:'Parrillada de Cordero',precio:27,desc:'2 presas, choclo, ensalada, chorizo'},
-    {id:'costillar_cordero',cat:'parrillas',nombre:'Costillar de Cordero',precio:36,desc:'6 tiras, choclo, ensalada, chorizo'}
-  ];
+  const carritoEl=$('#carrito'), carritoVacio=$('#carritoVacio'), enviarBtn=$('#enviar'), registroEl=$('#registro');
+  const status=$('#status');
 
   const cremaColors={'Mayonesa':'#fff8db','Ketchup':'#c81d25','Mostaza':'#f59e0b','Aceituna':'#6b7280','Aji':'#ef4444','Tartara':'#e5e7eb','Salsa Golf':'#fbbf24','Chimichurri':'#16a34a'};
 
-  const cart=[];
+  let CARTA = [];
+  const cart = [];
 
   function pintarMenu(){
-    const q=(buscarEl.value||'').toLowerCase(); const cat=catEl.value;
+    const q=(buscarEl.value||'').toLowerCase();
+    const cat=catEl.value;
+    if (!Array.isArray(CARTA) || CARTA.length===0) {
+      itemsCount.textContent = '0 ítems';
+      menuEl.innerHTML = '<small class="muted">Cargando carta...</small>';
+      return;
+    }
     const data=CARTA.filter(x=>(!cat||x.cat===cat)&&(x.nombre.toLowerCase().includes(q)||x.cat.includes(q)));
     itemsCount.textContent=`${data.length} ítems`;
     menuEl.innerHTML=data.map(x=>`<div class="item">
       <div class="row" style="justify-content:space-between">
-        <h3>${x.nombre}</h3>
-        <span class="price">S/ ${x.precio.toFixed(2)}</span>
+        <h3>${x.nombre}</h3><span class="price">S/ ${Number(x.precio||0).toFixed(2)}</span>
       </div>
       ${x.desc?`<small class="muted">${x.desc}</small>`:''}
       ${x.opciones?'<small class="muted">Incluye opciones</small>':'<small class="muted">Solo cantidad</small>'}
@@ -180,15 +179,17 @@ const firebaseConfig = {
 
   function agregar(id,custom={}){
     const it=CARTA.find(i=>i.id===id);
-    cart.push({ id:it.id,nombre:it.nombre,precio:it.precio,
+    if(!it){ alert('Producto no encontrado'); return; }
+    cart.push({ id:it.id,nombre:it.nombre,precio:Number(it.precio||0),
       cremas:custom.cremas||null,papas:custom.papas||null,ensalada:custom.ensalada||null,
-      detCremas:custom.detCremas||null,detPapas:custom.detPapas||null, ts:Date.now()
+      detCremas:custom.detCremas||null,detPapas:custom.detPapas||null,detEnsalada:custom.detEnsalada||null, ts:Date.now()
     });
     pintarCarrito();
   }
 
   function personalizar(id){
     const it=CARTA.find(i=>i.id===id);
+    if(!it){ alert('Producto no encontrado'); return; }
     if(!it.opciones){agregar(id);return;}
     abrirModal(it);
   }
@@ -196,48 +197,54 @@ const firebaseConfig = {
   function abrirModal(item){
     const body=document.getElementById('modalBody');
     document.getElementById('modalTitle').textContent=`Personalizar · ${item.nombre}`;
-
-    const cremasHTML=item.opciones.cremas.map(c=>`
+    const cremas=(item.opciones?.cremas||[]);
+    const papas=(item.opciones?.papas||[]);
+    const ensalada=(item.opciones?.ensalada||[]);
+    const cremasHTML=cremas.map(c=>`
       <label class="opt"><span class="sw" style="background:${cremaColors[c]||'#94a3b8'}"></span>
         <input type="checkbox" name="cremas" value="${c}"> ${c}
       </label>`).join('');
-
-    const papasHTML=item.opciones.papas.map(p=>`
+    const papasHTML=papas.map(p=>`
       <label class="opt"><input type="radio" name="papas" value="${p}"> ${p}</label>`).join('');
-
-    const ensaladaHTML=item.opciones.ensalada.map(e=>`
+    const ensaladaHTML=ensalada.map(e=>`
       <label class="opt"><input type="radio" name="ensalada" value="${e}"> ${e}</label>`).join('');
-
     body.innerHTML=`
       <div>
         <strong>Cremas</strong>
-        <div class="opts">${cremasHTML}</div>
+        <div class="opts">${cremasHTML||'<small class="muted">—</small>'}</div>
         <textarea id="detCremas" placeholder="Detalles opcionales de cremas (ej. poca mayonesa)"></textarea>
       </div>
       <div style="margin-top:10px">
         <strong>Tipo de papas</strong>
-        <div class="opts">${papasHTML}</div>
+        <div class="opts">${papasHTML||'<small class="muted">—</small>'}</div>
         <textarea id="detPapas" placeholder="Detalles opcionales de papas (ej. bien crocantes)"></textarea>
       </div>
       <div style="margin-top:10px">
         <strong>Ensalada</strong>
-        <div class="opts">${ensaladaHTML}</div>
+        <div class="opts">${ensaladaHTML||'<small class="muted">—</small>'}</div>
+        <textarea id="detEnsalada" placeholder="Detalles opcionales de ensalada (ej. sin cebolla)"></textarea>
       </div>`;
-
     const modal=document.getElementById('modal');
     modal.classList.add('show');
     modal.dataset.itemId=item.id;
-
-    // Enfocar primer control para habilitar teclado/scroll en móvil
-    const firstInput=document.querySelector('#modalBody input');
-    if(firstInput) setTimeout(()=>firstInput.focus(),50);
   }
 
-  // Cerrar modal
+  document.getElementById('guardarPersonalizacion').onclick = () => {
+    const modal = document.getElementById('modal');
+    const id = modal.dataset.itemId;
+    if (!id) return;
+    const cremas   = [...modal.querySelectorAll('input[name="cremas"]:checked')].map(x => x.value);
+    const papas    = (modal.querySelector('input[name="papas"]:checked') || {}).value || null;
+    const ensalada = (modal.querySelector('input[name="ensalada"]:checked') || {}).value || null;
+    const detCremas = (modal.querySelector('#detCremas')?.value || '').trim() || null;
+    const detPapas  = (modal.querySelector('#detPapas')?.value  || '').trim() || null;
+    const detEnsalada  = (modal.querySelector('#detEnsalada')?.value  || '').trim() || null;
+    agregar(modal.dataset.itemId, { cremas, papas, ensalada, detCremas, detPapas, detEnsalada });
+    modal.classList.remove('show');
+  };
   document.getElementById('cancelar').onclick=()=>document.getElementById('modal').classList.remove('show');
   document.getElementById('cerrarModal').onclick=()=>document.getElementById('modal').classList.remove('show');
   document.getElementById('modal').addEventListener('click',e=>{ if(e.target.id==='modal') e.currentTarget.classList.remove('show'); });
-  window.addEventListener('keydown',e=>{ if(e.key==='Escape'){ document.getElementById('modal').classList.remove('show'); }});
 
   function pintarCarrito(){
     carritoEl.innerHTML='';
@@ -246,8 +253,11 @@ const firebaseConfig = {
     cart.forEach((l,i)=>{
       suma+=l.precio;
       const div=document.createElement('div'); div.className='item';
-      const detalles=(l.cremas||l.papas||l.ensalada||l.detCremas||l.detPapas)
-        ? `<small class="muted">${l.cremas?`Cremas: ${l.cremas.join(', ')} · `:''}${l.papas?`Papas: ${l.papas} · `:''}${l.ensalada?`Ensalada: ${l.ensalada} · `:''}${l.detCremas?`Det. cremas: ${l.detCremas} · `:''}${l.detPapas?`Det. papas: ${l.detPapas}`:''}</small>` : '';
+      const partes=[];
+      if ((l.cremas && l.cremas.length) || l.detCremas) partes.push(`Cremas: ${l.cremas?.join(', ') || '—'}${l.detCremas?` (Det.: ${l.detCremas})`:''}`);
+      if (l.papas || l.detPapas) partes.push(`Papas: ${l.papas || '—'}${l.detPapas?` (Det.: ${l.detPapas})`:''}`);
+      if (l.ensalada || l.detEnsalada) partes.push(`Ensalada: ${l.ensalada || '—'}${l.detEnsalada?` (Det.: ${l.detEnsalada})`:''}`);
+      const detalles = partes.length ? `<small class="muted">• ${partes.join(' · ')}</small>` : '';
       div.innerHTML=`<div class="row" style="justify-content:space-between">
           <strong>${l.nombre}</strong><span class="price">S/ ${l.precio.toFixed(2)}</span></div>
         ${detalles}
@@ -255,53 +265,160 @@ const firebaseConfig = {
           <button class="ghost" data-i="${i}" data-act="dup">Duplicar</button>
           <button class="ghost" data-i="${i}" data-act="del" style="margin-left:auto">Eliminar</button>
         </div>`;
+      // Acciones
+      div.querySelector('[data-act="dup"]').onclick=()=>{ cart.push({...l, ts:Date.now()}); pintarCarrito(); };
+      div.querySelector('[data-act="del"]').onclick=()=>{ cart.splice(i,1); pintarCarrito(); };
       carritoEl.appendChild(div);
     });
-    totalEl.textContent=`S/ ${suma.toFixed(2)}`;
-    carritoEl.querySelectorAll('button').forEach(b=>{
-      const i=+b.dataset.i, act=b.dataset.act; if(isNaN(i)) return;
-      b.onclick=()=>{ if(act==='del') cart.splice(i,1); if(act==='dup') cart.splice(i+1,0,{...cart[i],ts:Date.now()}); pintarCarrito(); };
-    });
   }
-
-  enviarBtn.onclick=async()=>{
-    if(cart.length===0){alert('Agrega productos');return;}
-    const cliente=$('#cliente').value.trim();
-    const pago=$('#pago').value;
-    const pedido={cliente:cliente||null,pago,items:cart,total:cart.reduce((a,b)=>a+b.precio,0),ts:Date.now()};
-    try{enviarBtn.disabled=true;await push(ref(db,'pedidos'),pedido);cart.length=0;pintarCarrito();alert('✅ Pedido enviado');}
-    catch(e){alert('Error:'+e.message);} finally{enviarBtn.disabled=false;}
-  };
-
-  // Registro: render y toggle pagado/pendiente
-  function renderPedido(key,p){
-    let div = registroEl.querySelector(`.pedido[data-key="${key}"]`);
-    const d = new Date(p.ts);
-    const items = (p.items||[]).map(i=>`• ${i.nombre}${i.papas?` (${i.papas})`:''}`).join('<br>');
-    const pagoTxt = p.pago === 'pagado' ? 'Pagado' : 'Por pagar';
-    if(!div){ div=document.createElement('div'); div.className='pedido'; div.dataset.key=key; registroEl.prepend(div); }
-    div.innerHTML = `<div class="row" style="justify-content:space-between;align-items:center">
-        <div>
-          <strong>${p.cliente||'Sin nombre'}</strong> — <span class="badge">${pagoTxt}</span><br>
-          ${items}<br>
-          Total: S/ ${Number(p.total||0).toFixed(2)} <small class="muted">${d.toLocaleString()}</small>
-        </div>
-        <div class="row">
-          <button class="ghost" data-act="toggle" data-key="${key}">${p.pago==='pagado'?'Marcar pendiente':'Marcar pagado'}</button>
-        </div>
-      </div>`;
-    div.querySelector('button[data-act="toggle"]').onclick = async ()=>{
-      const nuevo = (p.pago === 'pagado') ? 'pendiente' : 'pagado';
-      try{ await update(ref(db, `pedidos/${key}`), { pago: nuevo }); }
-      catch(e){ alert('No se pudo actualizar: '+(e?.message||e)); }
-    };
-  }
-
-  onChildAdded(ref(db,'pedidos'), snap => { status.textContent='Conectado'; renderPedido(snap.key, snap.val()); });
-  onChildChanged(ref(db,'pedidos'), snap => { renderPedido(snap.key, snap.val()); });
 
   buscarEl.oninput=pintarMenu; catEl.onchange=pintarMenu;
   pintarMenu(); pintarCarrito();
+
+  /* ===================== FIREBASE ===================== */
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getDatabase, ref, push, onChildAdded, onChildChanged, update, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyC3w6KUZi0bKdSMP2f2M3ele8dLtCGpVLk",
+  authDomain: "parrillas-66b0e.firebaseapp.com",
+  databaseURL: "https://parrillas-66b0e-default-rtdb.firebaseio.com",
+  projectId: "parrillas-66b0e",
+  storageBucket: "parrillas-66b0e.firebasestorage.app",
+  messagingSenderId: "520361790818",
+  appId: "1:520361790818:web:36b65573eabde389c9f03b",
+  measurementId: "G-79700DWFFW"
+};
+
+  let db=null;
+  try{
+    const app = initializeApp(firebaseConfig);
+    db = getDatabase(app);
+    status.textContent='Conectado';
+  }catch(e){
+    console.error('Firebase no inició:', e);
+    status.textContent='Error: '+(e?.message||e);
+  }
+
+  function fmtItem(i){
+    const partes=[];
+    if ((i.cremas && i.cremas.length) || i.detCremas) partes.push(`Cremas: ${i.cremas?.join(', ') || '—'}${i.detCremas?` (Det.: ${i.detCremas})`:''}`);
+    if (i.papas || i.detPapas) partes.push(`Papas: ${i.papas || '—'}${i.detPapas?` (Det.: ${i.detPapas})`:''}`);
+    if (i.ensalada || i.detEnsalada) partes.push(`Ensalada: ${i.ensalada || '—'}${i.detEnsalada?` (Det.: ${i.detEnsalada})`:''}`);
+    return `<div class="it"><strong>${i.nombre}</strong>${partes.length?`<br><small class=\"muted\">• ${partes.join(' · ')}</small>`:''}</div>`;
+  }
+
+  if (db) {
+    // Cargar carta
+    onValue(ref(db,'carta'), snap => {
+      const val = snap.val();
+      CARTA = val ? Object.entries(val).map(([id, v]) => ({ id, ...v })) : [];
+      pintarMenu();
+    });
+
+    // Enviar pedido (siempre pendiente)
+    enviarBtn.onclick=async()=>{
+      if(cart.length===0){alert('Agrega productos');return;}
+      const cliente=$('#cliente').value.trim();
+      const pedido={
+        cliente:cliente||null,
+        pago:'pendiente',
+        metodo:null,
+        items:cart.slice(),
+        total:cart.reduce((a,b)=>a+b.precio,0),
+        ts:Date.now()
+      };
+      try{
+        enviarBtn.disabled=true;
+        await push(ref(db,'pedidos'),pedido);
+        cart.length=0; pintarCarrito(); $('#cliente').value='';
+        alert('✅ Pedido enviado');
+      }catch(e){ alert('Error:'+e.message); }
+      finally{ enviarBtn.disabled=false; }
+    };
+
+    // Resumen + Historial
+    const resEls={ped:$('#resPedidos'),pag:$('#resPagado'),pen:$('#resPendiente'),tot:$('#resTotal'),ef:$('#resEfec'),ya:$('#resYape')};
+    const pedidosHoy=new Map();
+    const isToday = (ts)=>{const d=new Date(ts),n=new Date();return d.getFullYear()===n.getFullYear()&&d.getMonth()===n.getMonth()&&d.getDate()===n.getDate()};
+
+    function recalcResumen(){
+      let pedidos=0, pagado=0, pendiente=0, ef=0, ya=0;
+      pedidosHoy.forEach(p=>{
+        pedidos++;
+        if(p.pago==='pagado') pagado+=Number(p.total||0); else pendiente+=Number(p.total||0);
+        if(p.metodo==='efectivo') ef+=Number(p.total||0);
+        if(p.metodo==='yape') ya+=Number(p.total||0);
+      });
+      resEls.ped.textContent=pedidos;
+      resEls.pag.textContent=pagado.toFixed(2);
+      resEls.pen.textContent=pendiente.toFixed(2);
+      resEls.tot.textContent=(pagado+pendiente).toFixed(2);
+      resEls.ef.textContent=ef.toFixed(2);
+      resEls.ya.textContent=ya.toFixed(2);
+    }
+
+    function renderPedido(key, p){
+      let div = registroEl.querySelector(`.pedido[data-key="${key}"]`);
+      const d = new Date(p.ts);
+      const items = (p.items||[]).map(fmtItem).join('<hr class="sep">');
+      const pagoTxt = p.pago === 'pagado' ? 'Pagado' : 'Por pagar';
+      if(!div){ div=document.createElement('div'); div.className='pedido'; div.dataset.key=key; registroEl.prepend(div); }
+      div.innerHTML = `
+        <div class="row" style="justify-content:space-between;align-items:center">
+          <div>
+            <strong>${p.cliente||'Sin nombre'}</strong>
+            <span class="badge ${p.pago==='pagado'?'':'ghost'}">${pagoTxt}</span>
+            ${p.metodo?`<span class="badge ${p.metodo}">${p.metodo}</span>`:''}<br>
+            ${items}<br>
+            Total: S/ ${Number(p.total||0).toFixed(2)} <small class="muted">${d.toLocaleString()}</small>
+          </div>
+          <div class="row">
+            <button class="ghost" data-act="toggle" data-key="${key}">
+              ${p.pago==='pagado'?'Marcar pendiente':'Marcar pagado'}
+            </button>
+          </div>
+        </div>`;
+      div.querySelector('button[data-act="toggle"]').onclick = async ()=>{
+        if (p.pago === 'pagado') {
+          await update(ref(db, `pedidos/${key}`), { pago: 'pendiente' });
+        } else {
+          openPayModal(key, p.metodo || 'efectivo');
+        }
+      };
+    }
+
+    onChildAdded(ref(db,'pedidos'), snap => {
+      const p=snap.val(); renderPedido(snap.key, p);
+      if(isToday(p.ts)) { pedidosHoy.set(snap.key,p); recalcResumen(); }
+    });
+    onChildChanged(ref(db,'pedidos'), snap => {
+      const p=snap.val(); renderPedido(snap.key, p);
+      if(isToday(p.ts)) { pedidosHoy.set(snap.key,p); } else { pedidosHoy.delete(snap.key); }
+      recalcResumen();
+    });
+  }
+
+  /* ===== Modal de Pago ===== */
+  const payModal = document.getElementById('payModal');
+  const payMetodoSel = document.getElementById('payMetodo');
+  let payKey = null;
+
+  function openPayModal(key, metodoActual) {
+    payKey = key;
+    payMetodoSel.value = (metodoActual === 'yape') ? 'yape' : 'efectivo';
+    payModal.classList.add('show');
+  }
+  function closePayModal() { payModal.classList.remove('show'); payKey = null; }
+  document.getElementById('closePay').onclick = closePayModal;
+  document.getElementById('cancelPay').onclick = closePayModal;
+  payModal.addEventListener('click', e => { if(e.target.id==='payModal') closePayModal(); });
+  document.getElementById('confirmPay').onclick = async () => {
+    if (!payKey) return;
+    const metodo = payMetodoSel.value;
+    try { await update(ref(db, `pedidos/${payKey}`), { pago: 'pagado', metodo }); closePayModal(); }
+    catch(e) { alert('No se pudo actualizar: ' + (e?.message||e)); }
+  };
 </script>
 </body>
 </html>
