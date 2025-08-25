@@ -114,18 +114,9 @@
 <!-- Resumen del día -->
 <section class="container card section" style="margin-top:12px">
   <h2 style="margin:0 0 8px 0">Resumen de ventas (hoy)</h2>
-<section class="container card section" style="margin-top:12px">
-  <h2 style="margin:0 0 8px 0">
-    Resumen de ventas (hoy)
-  </h2>
-
-  <!-- 👉 botón para generar PDF -->
   <div class="row" style="justify-content:flex-end;margin-bottom:8px">
     <button id="btnReporte" class="ghost">Descargar reporte (PDF)</button>
   </div>
-  <!-- /botón -->
-  
-  <div class="list" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px">
   <div class="list" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px">
     <div class="item"><strong>Pedidos</strong><div><span id="resPedidos">0</span></div></div>
     <div class="item"><strong>Total pagado</strong><div>S/ <span id="resPagado">0.00</span></div></div>
@@ -183,7 +174,7 @@
 
       <h4 style="margin:8px 0 4px 0">Ítems</h4>
       <div id="editItems" class="list" style="grid-template-columns:1fr; gap:8px"></div>
-      <small class="muted">Puedes duplicar o quitar ítems. (Edición detallada se puede hacer quitando y volviendo a agregar desde la carta.)</small>
+      <small class="muted">Puedes duplicar o quitar ítems. (Si necesitas cambiar opciones, quita y vuelve a agregar desde la carta.)</small>
     </div>
     <div class="actions">
       <button class="ghost" id="cancelEdit" type="button">Cancelar</button>
@@ -335,9 +326,7 @@
   function pintarCarrito(){
     carritoEl.innerHTML='';
     carritoVacio.style.display = cart.length ? 'none':'block';
-    let suma=0;
     cart.forEach((l,i)=>{
-      suma+=l.precio;
       const div=document.createElement('div'); div.className='item';
       const partes=[];
       if ((l.cremas && l.cremas.length) || l.detCremas) partes.push(`Cremas: ${l.cremas?.join(', ') || '—'}${l.detCremas?` (Det.: ${l.detCremas})`:''}`);
@@ -362,7 +351,7 @@
 
   /* ===================== FIREBASE ===================== */
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getDatabase, ref, push, onChildAdded, onChildChanged, update, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+  import { getDatabase, ref, push, onChildAdded, onChildChanged, onChildRemoved, onValue, update, remove, set } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyC3w6KUZi0bKdSMP2f2M3ele8dLtCGpVLk",
@@ -394,134 +383,8 @@
   }
 
   if (db) {
-
-	  function buildReporteData() {
-    const data = {
-      pedidos: 0,
-      pagado: 0,
-      pendiente: 0,
-      efectivo: 0,
-      yape: 0,
-      porServicio: { salon: 0, llevar: 0, delivery: 0 },
-      productos: new Map(), // nombre -> { qty, total }
-    };
-    pedidosHoy.forEach(p => {
-      data.pedidos++;
-      // totales pagado/pendiente
-      if (p.pago === 'pagado') data.pagado += Number(p.total||0);
-      else data.pendiente += Number(p.total||0);
-      // método
-      if (p.pago === 'pagado' && p.metodo === 'efectivo') data.efectivo += Number(p.total||0);
-      if (p.pago === 'pagado' && p.metodo === 'yape')     data.yape     += Number(p.total||0);
-      // servicio
-      if (p.servicio && data.porServicio[p.servicio] != null) data.porServicio[p.servicio]++;
-
-      // productos
-      (p.items||[]).forEach(it => {
-        const k = it.nombre || '—';
-        const prev = data.productos.get(k) || { qty: 0, total: 0 };
-        prev.qty += 1;
-        prev.total += Number(it.precio||0);
-        data.productos.set(k, prev);
-      });
-    });
-    return data;
-  }
-
-  // HTML imprimible A4
-  function reporteHTML() {
-    const f = new Date();
-    const fechaCab = f.toLocaleDateString() + ' ' + f.toLocaleTimeString();
-    const d = buildReporteData();
-
-    // Productos ordenados por cantidad desc
-    const rows = [...d.productos.entries()]
-      .sort((a,b)=> b[1].qty - a[1].qty)
-      .map(([name, v]) => `
-        <tr>
-          <td>${name}</td>
-          <td style="text-align:right">${v.qty}</td>
-          <td style="text-align:right">S/ ${v.total.toFixed(2)}</td>
-        </tr>
-      `).join('') || '<tr><td colspan="3" style="text-align:center;color:#666">— Sin ventas —</td></tr>';
-
-    return `<!doctype html><html><head><meta charset="utf-8"/>
-      <title>Reporte diario</title>
-      <style>
-        @page { size: A4 portrait; margin: 14mm; }
-        body { font-family: ui-sans-serif,system-ui,Segoe UI,Roboto,Arial; color:#111; }
-        h1 { margin:0 0 4px 0; font-size:18px }
-        h2 { margin:10px 0 6px 0; font-size:15px }
-        .muted{ color:#666; font-size:12px }
-        .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:8px; }
-        .card { border:1px solid #ddd; border-radius:10px; padding:10px; }
-        table { width:100%; border-collapse:collapse; margin-top:6px }
-        th, td { border-bottom:1px solid #eee; padding:6px 8px; font-size:13px }
-        th { background:#f7f7f7; text-align:left }
-        .right { text-align:right }
-        .tot { font-weight:700 }
-        .sep { height:1px; background:#ddd; margin:10px 0 }
-        .badge { display:inline-block; padding:2px 8px; border:1px solid #ccc; border-radius:999px; font-size:12px; }
-      </style>
-    </head><body>
-      <h1>VILLA GRILL · Reporte diario</h1>
-      <div class="muted">Generado: ${fechaCab}</div>
-
-      <div class="grid" style="margin-top:10px">
-        <div class="card">
-          <h2>Resumen</h2>
-          <table>
-            <tr><td>Pedidos</td><td class="right">${d.pedidos}</td></tr>
-            <tr><td>Pagado</td><td class="right">S/ ${d.pagado.toFixed(2)}</td></tr>
-            <tr><td>Pendiente</td><td class="right">S/ ${d.pendiente.toFixed(2)}</td></tr>
-            <tr class="tot"><td>Total del día</td><td class="right">S/ ${(d.pagado + d.pendiente).toFixed(2)}</td></tr>
-          </table>
-        </div>
-
-        <div class="card">
-          <h2>Por método (pagado)</h2>
-          <table>
-            <tr><td>Efectivo</td><td class="right">S/ ${d.efectivo.toFixed(2)}</td></tr>
-            <tr><td>Yape</td><td class="right">S/ ${d.yape.toFixed(2)}</td></tr>
-          </table>
-        </div>
-
-        <div class="card">
-          <h2>Por servicio</h2>
-          <table>
-            <tr><td>Salón / mesa</td><td class="right">${d.porServicio.salon}</td></tr>
-            <tr><td>Para llevar</td><td class="right">${d.porServicio.llevar}</td></tr>
-            <tr><td>Delivery</td><td class="right">${d.porServicio.delivery}</td></tr>
-          </table>
-        </div>
-      </div>
-
-      <div class="sep"></div>
-
-      <div class="card">
-        <h2>Productos vendidos (hoy)</h2>
-        <table>
-          <thead>
-            <tr><th>Producto</th><th style="text-align:right">Cant.</th><th style="text-align:right">Importe</th></tr>
-          </thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </div>
-
-      <script>window.onload=()=>{ window.print(); setTimeout(()=>window.close(), 300); }<\/script>
-    </body></html>`;
-  }
-
-  function abrirReportePDF(){
-    const w = window.open('', '_blank');
-    if(!w){ alert('Habilita ventanas emergentes para descargar el PDF'); return; }
-    w.document.open();
-    w.document.write(reporteHTML());
-    w.document.close();
-  }
-
-  // Click del botón
-  document.getElementById('btnReporte').onclick = abrirReportePDF;
+    // --- Reporte PDF (usa pedidosHoy) ---
+    document.getElementById('btnReporte').onclick = abrirReportePDF;
 
     // Cargar carta
     onValue(ref(db,'carta'), snap => {
@@ -562,7 +425,7 @@
       finally{ enviarBtn.disabled=false; }
     };
 
-    // Resumen + Historial
+    // Resumen + Historial del día
     const resEls={ped:$('#resPedidos'),pag:$('#resPagado'),pen:$('#resPendiente'),tot:$('#resTotal'),ef:$('#resEfec'),ya:$('#resYape')};
     const pedidosHoy=new Map();
     const isToday = (ts)=>{const d=new Date(ts),n=new Date();return d.getFullYear()===n.getFullYear()&&d.getMonth()===n.getMonth()&&d.getDate()===n.getDate()};
@@ -620,6 +483,7 @@
             <button class="ghost" data-act="edit" data-key="${key}" style="margin-left:8px">Editar</button>
             <button class="ghost" data-act="print-cocina" data-key="${key}" style="margin-left:8px">Imprimir cocina</button>
             <button class="ghost" data-act="print-cliente" data-key="${key}" style="margin-left:8px">Imprimir cliente</button>
+            <button class="ghost" data-act="del-pedido" data-key="${key}" style="margin-left:8px;color:#fca5a5;border-color:#7f1d1d">Eliminar</button>
           </div>
         </div>`;
       div.querySelector('button[data-act="toggle"]').onclick = async ()=>{
@@ -629,11 +493,10 @@
           openPayModal(key, p.metodo || 'efectivo');
         }
       };
-      // Abrir modal de edición
       div.querySelector('button[data-act="edit"]').onclick = ()=> openEditModal(key, p);
-      // Imprimir tickets
       div.querySelector('button[data-act="print-cocina"]').onclick = ()=> printPedido(key, p, 'cocina');
       div.querySelector('button[data-act="print-cliente"]').onclick = ()=> printPedido(key, p, 'cliente');
+      div.querySelector('button[data-act="del-pedido"]').onclick = ()=> eliminarPedido(key, p);
     }
 
     onChildAdded(ref(db,'pedidos'), snap => {
@@ -645,231 +508,325 @@
       if(isToday(p.ts)) { pedidosHoy.set(snap.key,p); } else { pedidosHoy.delete(snap.key); }
       recalcResumen();
     });
-  }
+    onChildRemoved(ref(db,'pedidos'), snap => {
+      const k = snap.key;
+      const nodo = registroEl.querySelector(`.pedido[data-key="${k}"]`);
+      if (nodo) nodo.remove();
+      if (pedidosHoy.has(k)) { pedidosHoy.delete(k); recalcResumen(); }
+    });
 
-  /* ===== Modal de Pago ===== */
-  const payModal = document.getElementById('payModal');
-  const payMetodoSel = document.getElementById('payMetodo');
-  let payKey = null;
+    // ====== Eliminar pedido (archivar + historial) ======
+    async function eliminarPedido(key, p){
+      const ok = confirm(`¿Eliminar el pedido de ${p.cliente || 'Sin nombre'}? Se guardará una copia en "eliminados".`);
+      if (!ok) return;
+      const now = Date.now();
+      const resumen = `ELIMINADO · total S/ ${Number(p.total||0).toFixed(2)} · ${p.pago==='pagado' ? ('pagado ' + (p.metodo||'')) : 'pendiente'}`;
+      try {
+        // leer historial
+        let hist = {};
+        await new Promise(resolve => onValue(ref(db, `pedidos/${key}/historial`), s => { hist = s.val() || {}; resolve(); }, { onlyOnce:true }));
+        // registrar entrada
+        const entryKey = `h_${now}`;
+        hist[entryKey] = { ts: now, resumen };
+        // copiar a /eliminados
+        const copia = { ...p, eliminado: true, eliminadoTs: now, historial: hist };
+        await set(ref(db, `eliminados/${key}`), copia);
+        // borrar
+        await remove(ref(db, `pedidos/${key}`));
+        alert('🗑️ Pedido eliminado y archivado.');
+      } catch(e){
+        alert('No se pudo eliminar: ' + (e?.message || e));
+      }
+    }
 
-  function openPayModal(key, metodoActual) {
-    payKey = key;
-    payMetodoSel.value = (metodoActual === 'yape') ? 'yape' : 'efectivo';
-    payModal.classList.add('show');
-  }
-  function closePayModal() { payModal.classList.remove('show'); payKey = null; }
-  document.getElementById('closePay').onclick = closePayModal;
-  document.getElementById('cancelPay').onclick = closePayModal;
-  payModal.addEventListener('click', e => { if(e.target.id==='payModal') closePayModal(); });
-  document.getElementById('confirmPay').onclick = async () => {
-    if (!payKey) return;
-    const metodo = payMetodoSel.value;
-    try { await update(ref(db, `pedidos/${payKey}`), { pago: 'pagado', metodo }); closePayModal(); }
-    catch(e) { alert('No se pudo actualizar: ' + (e?.message||e)); }
-  };
+    // ===== Modal de Pago =====
+    const payModal = document.getElementById('payModal');
+    const payMetodoSel = document.getElementById('payMetodo');
+    let payKey = null;
+    function openPayModal(key, metodoActual) {
+      payKey = key; payMetodoSel.value = (metodoActual === 'yape') ? 'yape' : 'efectivo';
+      payModal.classList.add('show');
+    }
+    function closePayModal() { payModal.classList.remove('show'); payKey = null; }
+    document.getElementById('closePay').onclick = closePayModal;
+    document.getElementById('cancelPay').onclick = closePayModal;
+    payModal.addEventListener('click', e => { if(e.target.id==='payModal') closePayModal(); });
+    document.getElementById('confirmPay').onclick = async () => {
+      if (!payKey) return;
+      const metodo = payMetodoSel.value;
+      try { await update(ref(db, `pedidos/${payKey}`), { pago: 'pagado', metodo }); closePayModal(); }
+      catch(e) { alert('No se pudo actualizar: ' + (e?.message||e)); }
+    };
 
-  /* ===== Edición de Pedidos ===== */
-  const editModal = document.getElementById('editModal');
-  const editCliente = document.getElementById('editCliente');
-  const editTelefono = document.getElementById('editTelefono');
-  const editServicio = document.getElementById('editServicio');
-  const editMesaWrap = document.getElementById('editMesaWrap');
-  const editMesa = document.getElementById('editMesa');
-  const editDirWrap = document.getElementById('editDirWrap');
-  const editDireccion = document.getElementById('editDireccion');
-  const editEnvio = document.getElementById('editEnvio');
-  const editItemsEl = document.getElementById('editItems');
-  let editKey = null; let editItems = [];
-  editServicio.onchange = syncEditServicioUI_Edit;
+    // ===== Edición de Pedidos =====
+    const editModal = document.getElementById('editModal');
+    const editCliente = document.getElementById('editCliente');
+    const editTelefono = document.getElementById('editTelefono');
+    const editServicio = document.getElementById('editServicio');
+    const editMesaWrap = document.getElementById('editMesaWrap');
+    const editMesa = document.getElementById('editMesa');
+    const editDirWrap = document.getElementById('editDirWrap');
+    const editDireccion = document.getElementById('editDireccion');
+    const editEnvio = document.getElementById('editEnvio');
+    const editItemsEl = document.getElementById('editItems');
+    let editKey = null; let editItems = [];
+    editServicio.onchange = syncEditServicioUI_Edit;
+    function syncEditServicioUI_Edit(){
+      const v = editServicio.value;
+      editMesaWrap.style.display = (v === 'salon') ? 'flex' : 'none';
+      editDirWrap.style.display  = (v === 'delivery') ? 'flex' : 'none';
+    }
+    function renderEditItems(){
+      if (!Array.isArray(editItems)) editItems = [];
+      editItemsEl.innerHTML = '';
+      editItems.forEach((it, idx) => {
+        const div = document.createElement('div');
+        div.className = 'item';
+        const partes=[];
+        if ((it.cremas && it.cremas.length) || it.detCremas) partes.push(`Cremas: ${it.cremas?.join(', ') || '—'}${it.detCremas?` (Det.: ${it.detCremas})`:''}`);
+        if (it.papas || it.detPapas) partes.push(`Papas: ${it.papas || '—'}${it.detPapas?` (Det.: ${it.detPapas})`:''}`);
+        if (it.ensalada || it.detEnsalada) partes.push(`Ensalada: ${it.ensalada || '—'}${it.detEnsalada?` (Det.: ${it.detEnsalada})`:''}`);
+        div.innerHTML = `
+          <div class="row" style="justify-content:space-between">
+            <strong>${it.nombre}</strong><span class="price">S/ ${Number(it.precio||0).toFixed(2)}</span>
+          </div>
+          ${partes.length?`<small class="muted">• ${partes.join(' · ')}</small>`:''}
+          <div class="row">
+            <button class="ghost" data-act="dup" data-i="${idx}">Duplicar</button>
+            <button class="ghost" data-act="del" data-i="${idx}" style="margin-left:auto">Quitar</button>
+          </div>`;
+        div.querySelector('[data-act="dup"]').onclick = () => { editItems.splice(idx+1,0,{...it, ts:Date.now()}); renderEditItems(); };
+        div.querySelector('[data-act="del"]').onclick = () => { editItems.splice(idx,1); renderEditItems(); };
+        editItemsEl.appendChild(div);
+      });
+    }
+    function openEditModal(key, p){
+      editKey = key;
+      editCliente.value = p.cliente || '';
+      editTelefono.value = p.telefono || '';
+      editServicio.value = p.servicio || 'salon';
+      editMesa.value = p.mesa || '';
+      editDireccion.value = p.direccion || '';
+      editEnvio.value = (p.envio!=null? p.envio : '').toString();
+      editItems = Array.isArray(p.items) ? JSON.parse(JSON.stringify(p.items)) : [];
+      syncEditServicioUI_Edit();
+      renderEditItems();
+      editModal.classList.add('show');
+    }
+    function closeEdit(){ editModal.classList.remove('show'); editKey = null; editItems = []; }
+    document.getElementById('closeEdit').onclick = closeEdit;
+    document.getElementById('cancelEdit').onclick = closeEdit;
+    editModal.addEventListener('click', e => { if(e.target.id==='editModal') closeEdit(); });
 
-  function syncEditServicioUI_Edit(){
-    const v = editServicio.value;
-    editMesaWrap.style.display = (v === 'salon') ? 'flex' : 'none';
-    editDirWrap.style.display  = (v === 'delivery') ? 'flex' : 'none';
-  }
+    function resumirCambios(ant, neu){
+      const cambios=[];
+      const campos = ['cliente','telefono','servicio','mesa','direccion','envio'];
+      campos.forEach(k=>{ if ((ant?.[k]??null) !== (neu?.[k]??null)) cambios.push(`${k}: "${ant?.[k]??''}" → "${neu?.[k]??''}"`); });
+      const lenA = (ant.items||[]).length, lenN = (neu.items||[]).length;
+      if (lenA !== lenN) cambios.push(`ítems: ${lenA} → ${lenN}`);
+      const totA = Number(ant.total||0).toFixed(2), totN = Number(neu.total||0).toFixed(2);
+      if (totA !== totN) cambios.push(`total: S/ ${totA} → S/ ${totN}`);
+      return cambios.join(' | ');
+    }
+    document.getElementById('saveEdit').onclick = async () => {
+      if (!editKey) return;
+      const snapRef = ref(db, `pedidos/${editKey}`);
+      const cliente = editCliente.value.trim() || null;
+      const telefono = editTelefono.value.trim() || null;
+      const servicio = editServicio.value || 'salon';
+      const mesa = (servicio==='salon') ? (editMesa.value.trim() || null) : null;
+      const direccion = (servicio==='delivery') ? (editDireccion.value.trim() || null) : null;
+      const envio = (servicio==='delivery') ? Number(editEnvio.value||0) : 0;
+      const total = editItems.reduce((a,b)=>a+Number(b.precio||0), 0);
+      try {
+        let anterior = null;
+        await new Promise((resolve) => onValue(snapRef, s=>{ anterior = s.val(); resolve(); }, { onlyOnce:true }));
+        const nuevo = { ...anterior, cliente, telefono, servicio, mesa, direccion, envio, items: editItems, total };
+        const resumen = resumirCambios(anterior||{}, nuevo);
+        await update(snapRef, { cliente, telefono, servicio, mesa, direccion, envio, items: editItems, total });
+        await push(ref(db, `pedidos/${editKey}/historial`), { ts: Date.now(), resumen });
+        closeEdit();
+        alert('✅ Pedido actualizado');
+      } catch(e){
+        alert('No se pudo actualizar: ' + (e?.message||e));
+      }
+    };
 
-  function renderEditItems(){
-    if (!Array.isArray(editItems)) editItems = [];
-    editItemsEl.innerHTML = '';
-    editItems.forEach((it, idx) => {
-      const div = document.createElement('div');
-      div.className = 'item';
+    // ======= Reporte diario (PDF) =======
+    function buildReporteData() {
+      const data = {
+        pedidos: 0, pagado: 0, pendiente: 0, efectivo: 0, yape: 0,
+        porServicio: { salon: 0, llevar: 0, delivery: 0 },
+        productos: new Map(),
+      };
+      pedidosHoy.forEach(p => {
+        data.pedidos++;
+        if (p.pago === 'pagado') data.pagado += Number(p.total||0);
+        else data.pendiente += Number(p.total||0);
+        if (p.pago === 'pagado' && p.metodo === 'efectivo') data.efectivo += Number(p.total||0);
+        if (p.pago === 'pagado' && p.metodo === 'yape')     data.yape     += Number(p.total||0);
+        if (p.servicio && data.porServicio[p.servicio] != null) data.porServicio[p.servicio]++;
+        (p.items||[]).forEach(it => {
+          const k = it.nombre || '—';
+          const prev = data.productos.get(k) || { qty: 0, total: 0 };
+          prev.qty += 1;
+          prev.total += Number(it.precio||0);
+          data.productos.set(k, prev);
+        });
+      });
+      return data;
+    }
+    function reporteHTML() {
+      const f = new Date();
+      const fechaCab = f.toLocaleDateString() + ' ' + f.toLocaleTimeString();
+      const d = buildReporteData();
+      const rows = [...d.productos.entries()]
+        .sort((a,b)=> b[1].qty - a[1].qty)
+        .map(([name, v]) => `
+          <tr>
+            <td>${name}</td>
+            <td style="text-align:right">${v.qty}</td>
+            <td style="text-align:right">S/ ${v.total.toFixed(2)}</td>
+          </tr>`).join('') || '<tr><td colspan="3" style="text-align:center;color:#666">— Sin ventas —</td></tr>';
+      return `<!doctype html><html><head><meta charset="utf-8"/>
+        <title>Reporte diario</title>
+        <style>
+          @page { size: A4 portrait; margin: 14mm; }
+          body { font-family: ui-sans-serif,system-ui,Segoe UI,Roboto,Arial; color:#111; }
+          h1 { margin:0 0 4px 0; font-size:18px }
+          h2 { margin:10px 0 6px 0; font-size:15px }
+          .muted{ color:#666; font-size:12px }
+          .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:8px; }
+          .card { border:1px solid #ddd; border-radius:10px; padding:10px; }
+          table { width:100%; border-collapse:collapse; margin-top:6px }
+          th, td { border-bottom:1px solid #eee; padding:6px 8px; font-size:13px }
+          th { background:#f7f7f7; text-align:left }
+          .right { text-align:right }
+          .tot { font-weight:700 }
+        </style>
+      </head><body>
+        <h1>VILLA GRILL · Reporte diario</h1>
+        <div class="muted">Generado: ${fechaCab}</div>
+        <div class="grid" style="margin-top:10px">
+          <div class="card">
+            <h2>Resumen</h2>
+            <table>
+              <tr><td>Pedidos</td><td class="right">${d.pedidos}</td></tr>
+              <tr><td>Pagado</td><td class="right">S/ ${d.pagado.toFixed(2)}</td></tr>
+              <tr><td>Pendiente</td><td class="right">S/ ${d.pendiente.toFixed(2)}</td></tr>
+              <tr class="tot"><td>Total del día</td><td class="right">S/ ${(d.pagado + d.pendiente).toFixed(2)}</td></tr>
+            </table>
+          </div>
+          <div class="card">
+            <h2>Por método (pagado)</h2>
+            <table>
+              <tr><td>Efectivo</td><td class="right">S/ ${d.efectivo.toFixed(2)}</td></tr>
+              <tr><td>Yape</td><td class="right">S/ ${d.yape.toFixed(2)}</td></tr>
+            </table>
+          </div>
+          <div class="card">
+            <h2>Por servicio</h2>
+            <table>
+              <tr><td>Salón / mesa</td><td class="right">${d.porServicio.salon}</td></tr>
+              <tr><td>Para llevar</td><td class="right">${d.porServicio.llevar}</td></tr>
+              <tr><td>Delivery</td><td class="right">${d.porServicio.delivery}</td></tr>
+            </table>
+          </div>
+        </div>
+        <div class="card" style="margin-top:10px">
+          <h2>Productos vendidos (hoy)</h2>
+          <table>
+            <thead>
+              <tr><th>Producto</th><th style="text-align:right">Cant.</th><th style="text-align:right">Importe</th></tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+        <script>window.onload=()=>{ window.print(); setTimeout(()=>window.close(), 300); }<\/script>
+      </body></html>`;
+    }
+    function abrirReportePDF(){
+      const w = window.open('', '_blank');
+      if(!w){ alert('Habilita ventanas emergentes para descargar el PDF'); return; }
+      w.document.open();
+      w.document.write(reporteHTML());
+      w.document.close();
+    }
+
+    // ===== Impresión tickets =====
+    const TICKET_WIDTH_MM = 80; // cambia a 58 si tu rollo es 58mm
+    function itemDetalles(it){
       const partes=[];
       if ((it.cremas && it.cremas.length) || it.detCremas) partes.push(`Cremas: ${it.cremas?.join(', ') || '—'}${it.detCremas?` (Det.: ${it.detCremas})`:''}`);
       if (it.papas || it.detPapas) partes.push(`Papas: ${it.papas || '—'}${it.detPapas?` (Det.: ${it.detPapas})`:''}`);
       if (it.ensalada || it.detEnsalada) partes.push(`Ensalada: ${it.ensalada || '—'}${it.detEnsalada?` (Det.: ${it.detEnsalada})`:''}`);
-      div.innerHTML = `
-        <div class="row" style="justify-content:space-between">
-          <strong>${it.nombre}</strong><span class="price">S/ ${Number(it.precio||0).toFixed(2)}</span>
-        </div>
-        ${partes.length?`<small class="muted">• ${partes.join(' · ')}</small>`:''}
-        <div class="row">
-          <button class="ghost" data-act="dup" data-i="${idx}">Duplicar</button>
-          <button class="ghost" data-act="del" data-i="${idx}" style="margin-left:auto">Quitar</button>
-        </div>`;
-      div.querySelector('[data-act="dup"]').onclick = () => { editItems.splice(idx+1,0,{...it, ts:Date.now()}); renderEditItems(); };
-      div.querySelector('[data-act="del"]').onclick = () => { editItems.splice(idx,1); renderEditItems(); };
-      editItemsEl.appendChild(div);
-    });
-  }
-
-  function openEditModal(key, p){
-    editKey = key;
-    editCliente.value = p.cliente || '';
-    editTelefono.value = p.telefono || '';
-    editServicio.value = p.servicio || 'salon';
-    editMesa.value = p.mesa || '';
-    editDireccion.value = p.direccion || '';
-    editEnvio.value = (p.envio!=null? p.envio : '').toString();
-    editItems = Array.isArray(p.items) ? JSON.parse(JSON.stringify(p.items)) : [];
-    syncEditServicioUI_Edit();
-    renderEditItems();
-    editModal.classList.add('show');
-  }
-  function closeEdit(){ editModal.classList.remove('show'); editKey = null; editItems = []; }
-  document.getElementById('closeEdit').onclick = closeEdit;
-  document.getElementById('cancelEdit').onclick = closeEdit;
-  editModal.addEventListener('click', e => { if(e.target.id==='editModal') closeEdit(); });
-
-  function resumirCambios(ant, neu){
-    const cambios=[];
-    const campos = ['cliente','telefono','servicio','mesa','direccion','envio'];
-    campos.forEach(k=>{ if ((ant?.[k]??null) !== (neu?.[k]??null)) cambios.push(`${k}: "${ant?.[k]??''}" → "${neu?.[k]??''}"`); });
-    const lenA = (ant.items||[]).length, lenN = (neu.items||[]).length;
-    if (lenA !== lenN) cambios.push(`ítems: ${lenA} → ${lenN}`);
-    const totA = Number(ant.total||0).toFixed(2), totN = Number(neu.total||0).toFixed(2);
-    if (totA !== totN) cambios.push(`total: S/ ${totA} → S/ ${totN}`);
-    return cambios.join(' | ');
-  }
-
-  document.getElementById('saveEdit').onclick = async () => {
-    if (!editKey) return;
-    const snapRef = ref(db, `pedidos/${editKey}`);
-    // Nuevos valores
-    const cliente = editCliente.value.trim() || null;
-    const telefono = editTelefono.value.trim() || null;
-    const servicio = editServicio.value || 'salon';
-    const mesa = (servicio==='salon') ? (editMesa.value.trim() || null) : null;
-    const direccion = (servicio==='delivery') ? (editDireccion.value.trim() || null) : null;
-    const envio = (servicio==='delivery') ? Number(editEnvio.value||0) : 0;
-
-    // Recalcular total (solo ítems)
-    const total = editItems.reduce((a,b)=>a+Number(b.precio||0), 0);
-
-    try {
-      // Estado anterior (para historial)
-      let anterior = null;
-      await new Promise((resolve) => onValue(snapRef, s=>{ anterior = s.val(); resolve(); }, { onlyOnce:true }));
-
-      const nuevo = { ...anterior, cliente, telefono, servicio, mesa, direccion, envio, items: editItems, total };
-      const resumen = resumirCambios(anterior||{}, nuevo);
-
-      await update(snapRef, { cliente, telefono, servicio, mesa, direccion, envio, items: editItems, total });
-      await push(ref(db, `pedidos/${editKey}/historial`), { ts: Date.now(), resumen });
-
-      closeEdit();
-      alert('✅ Pedido actualizado');
-    } catch(e){
-      alert('No se pudo actualizar: ' + (e?.message||e));
+      return partes;
     }
-  };
-
-  /* ======= Impresión por navegador (80mm/58mm) ======= */
-  // Cambia a 58 si tu rollo es de 58mm
-  const TICKET_WIDTH_MM = 80;
-
-  function formatMoney(n){ return Number(n||0).toFixed(2); }
-  function itemDetalles(it){
-    const partes=[];
-    if ((it.cremas && it.cremas.length) || it.detCremas) partes.push(`Cremas: ${it.cremas?.join(', ') || '—'}${it.detCremas?` (Det.: ${it.detCremas})`:''}`);
-    if (it.papas || it.detPapas) partes.push(`Papas: ${it.papas || '—'}${it.detPapas?` (Det.: ${it.detPapas})`:''}`);
-    if (it.ensalada || it.detEnsalada) partes.push(`Ensalada: ${it.ensalada || '—'}${it.detEnsalada?` (Det.: ${it.detEnsalada})`:''}`);
-    return partes;
-  }
-
-  function ticketHTML(key, p, tipo='cocina'){
-  const ancho = `${TICKET_WIDTH_MM}mm`;
-  const fecha = new Date(p.ts||Date.now()).toLocaleString();
-  const titulo = (tipo==='cliente')? 'COMPROBANTE CLIENTE' : 'TICKET COCINA';
-  const servicioTxt = p.servicio==='delivery' ? 'DELIVERY' : (p.servicio==='llevar' ? 'PARA LLEVAR' : 'SALÓN');
-
-  // === Estado de pago grande (abajo) ===
-  const esPagado = (p.pago === 'pagado');
-  const metodoTxt = p.metodo ? ` · ${String(p.metodo).toUpperCase()}` : '';
-  const estadoTxt = esPagado ? `PAGADO${metodoTxt}` : 'POR PAGAR';
-
-  const itemsHTML = (p.items||[]).map(it => {
-    const partes=[];
-    if ((it.cremas && it.cremas.length) || it.detCremas) partes.push(`Cremas: ${it.cremas?.join(', ') || '—'}${it.detCremas?` (Det.: ${it.detCremas})`:''}`);
-    if (it.papas || it.detPapas) partes.push(`Papas: ${it.papas || '—'}${it.detPapas?` (Det.: ${it.detPapas})`:''}`);
-    if (it.ensalada || it.detEnsalada) partes.push(`Ensalada: ${it.ensalada || '—'}${it.detEnsalada?` (Det.: ${it.detEnsalada})`:''}`);
-
-    const dets = partes.map(d=>`<div class="d">• ${d}</div>`).join('');
-    const lineaPrecio = (tipo==='cliente') ? `<span>S/ ${Number(it.precio||0).toFixed(2)}</span>` : '';
-    return `<div class="it">
-      <div class="row1"><span>${it.nombre}</span>${lineaPrecio}</div>
-      ${dets}
-    </div>`;
-  }).join('');
-
-  const envioHTML = (p.servicio==='delivery' && Number(p.envio||0)>0 && tipo==='cliente')
-    ? `<div class="totline"><b>Envío</b><b>S/ ${Number(p.envio||0).toFixed(2)}</b></div>` : '';
-
-  const totCliente = (tipo==='cliente')
-    ? `<div class="tot">
-         ${envioHTML}
-         <div class="totline grand"><b>TOTAL</b><b>S/ ${Number((p.total||0)+Number(p.envio||0)).toFixed(2)}</b></div>
-       </div>`
-    : '';
-
-  const contacto = [
-    p.telefono?`📞 ${p.telefono}`:null,
-    (p.servicio==='salon'&&p.mesa)?`Mesa ${p.mesa}`:null,
-    (p.servicio==='delivery'&&p.direccion)?`📍 ${p.direccion}`:null,
-  ].filter(Boolean).join(' · ');
-
-  return `<!doctype html><html><head><meta charset="utf-8"/>
-    <style>
-      @page { size: ${ancho} auto; margin: 0; }
-      body { font: 12px monospace; color:#000; margin:0; width:${ancho}; text-align:left; }
-      .center{text-align:center}
-      .row1{display:flex;justify-content:space-between}
-      .it{margin:6px 0}
-      .d{color:#333}
-      .hr{margin:6px 0;border-top:1px dashed #000}
-      .tot{margin-top:6px}
-      .totline{display:flex;justify-content:space-between}
-      .grand{font-size:14px}
-      /* Estado de pago grande */
-      .status{margin:10px 0 4px 0; padding:8px 6px; text-align:center; font-weight:900; 
-              border:2px dashed #000; font-size:18px; }
-      .ok{border-style:solid;}
-    </style>
-  </head><body>
-    <div class="center"><div><b>VILLA GRILL</b></div>
-    <div>${titulo}</div></div>
-    <div class="hr"></div>
-    <div><b>Cliente:</b> ${p.cliente||'—'}</div>
-    ${contacto?`<div>${contacto}</div>`:''}
-    <div><b>Servicio:</b> ${servicioTxt}</div>
-    <div><b>Pedido:</b> ${key}</div>
-    <div><b>Fecha:</b> ${fecha}</div>
-    <div class="hr"></div>
-    ${itemsHTML}
-    <div class="hr"></div>
-    ${totCliente}
-    <div class="status ${esPagado?'ok':''}">${estadoTxt}</div>
-    <div class="center">¡Gracias!</div>
-    <script>window.onload=()=>{window.print(); setTimeout(()=>window.close(), 300);};<\/script>
-  </body></html>`;
-}
-
-  function printPedido(key, p, tipo='cocina'){
-    const w = window.open('', '_blank', 'width=400,height=700');
-    if (!w) { alert('Bloqueador de popups: habilita ventanas emergentes para imprimir.'); return; }
-    w.document.open();
-    w.document.write(ticketHTML(key, p, tipo));
-    w.document.close();
+    function ticketHTML(key, p, tipo='cocina'){
+      const ancho = `${TICKET_WIDTH_MM}mm`;
+      const fecha = new Date(p.ts||Date.now()).toLocaleString();
+      const titulo = (tipo==='cliente')? 'COMPROBANTE CLIENTE' : 'TICKET COCINA';
+      const servicioTxt = p.servicio==='delivery' ? 'DELIVERY' : (p.servicio==='llevar' ? 'PARA LLEVAR' : 'SALÓN');
+      const esPagado = (p.pago === 'pagado');
+      const metodoTxt = p.metodo ? ` · ${String(p.metodo).toUpperCase()}` : '';
+      const estadoTxt = esPagado ? `PAGADO${metodoTxt}` : 'POR PAGAR';
+      const itemsHTML = (p.items||[]).map(it => {
+        const dets = itemDetalles(it).map(d=>`<div class="d">• ${d}</div>`).join('');
+        const lineaPrecio = (tipo==='cliente') ? `<span>S/ ${Number(it.precio||0).toFixed(2)}</span>` : '';
+        return `<div class="it">
+          <div class="row1"><span>${it.nombre}</span>${lineaPrecio}</div>${dets}
+        </div>`;
+      }).join('');
+      const envioHTML = (p.servicio==='delivery' && Number(p.envio||0)>0 && tipo==='cliente')
+        ? `<div class="totline"><b>Envío</b><b>S/ ${Number(p.envio||0).toFixed(2)}</b></div>` : '';
+      const totCliente = (tipo==='cliente')
+        ? `<div class="tot">${envioHTML}
+             <div class="totline grand"><b>TOTAL</b><b>S/ ${Number((p.total||0)+Number(p.envio||0)).toFixed(2)}</b></div>
+           </div>` : '';
+      const contacto = [
+        p.telefono?`📞 ${p.telefono}`:null,
+        (p.servicio==='salon'&&p.mesa)?`Mesa ${p.mesa}`:null,
+        (p.servicio==='delivery'&&p.direccion)?`📍 ${p.direccion}`:null,
+      ].filter(Boolean).join(' · ');
+      return `<!doctype html><html><head><meta charset="utf-8"/>
+        <style>
+          @page { size: ${ancho} auto; margin: 0; }
+          body { font: 12px monospace; color:#000; margin:0; width:${ancho}; text-align:left; }
+          .center{text-align:center}
+          .row1{display:flex;justify-content:space-between}
+          .it{margin:6px 0}
+          .d{color:#333}
+          .hr{margin:6px 0;border-top:1px dashed #000}
+          .tot{margin-top:6px}
+          .totline{display:flex;justify-content:space-between}
+          .grand{font-size:14px}
+          .status{margin:10px 0 4px 0; padding:8px 6px; text-align:center; font-weight:900; border:2px dashed #000; font-size:18px}
+          .ok{border-style:solid;}
+        </style>
+      </head><body>
+        <div class="center"><div><b>VILLA GRILL</b></div><div>${titulo}</div></div>
+        <div class="hr"></div>
+        <div><b>Cliente:</b> ${p.cliente||'—'}</div>
+        ${contacto?`<div>${contacto}</div>`:''}
+        <div><b>Servicio:</b> ${servicioTxt}</div>
+        <div><b>Pedido:</b> ${key}</div>
+        <div><b>Fecha:</b> ${fecha}</div>
+        <div class="hr"></div>
+        ${itemsHTML}
+        <div class="hr"></div>
+        ${totCliente}
+        <div class="status ${esPagado?'ok':''}">${estadoTxt}</div>
+        <div class="center">¡Gracias!</div>
+        <script>window.onload=()=>{window.print(); setTimeout(()=>window.close(),300);};<\/script>
+      </body></html>`;
+    }
+    function printPedido(key, p, tipo='cocina'){
+      const w = window.open('', '_blank', 'width=400,height=700');
+      if (!w) { alert('Bloqueador de popups: habilita ventanas emergentes para imprimir.'); return; }
+      w.document.open();
+      w.document.write(ticketHTML(key, p, tipo));
+      w.document.close();
+    }
   }
 </script>
 </body>
