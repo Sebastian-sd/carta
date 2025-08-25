@@ -762,64 +762,108 @@
       if (it.ensalada || it.detEnsalada) partes.push(`Ensalada: ${it.ensalada || '—'}${it.detEnsalada?` (Det.: ${it.detEnsalada})`:''}`);
       return partes;
     }
-    function ticketHTML(key, p, tipo='cocina'){
-      const ancho = `${TICKET_WIDTH_MM}mm`;
-      const fecha = new Date(p.ts||Date.now()).toLocaleString();
-      const titulo = (tipo==='cliente')? 'COMPROBANTE CLIENTE' : 'TICKET COCINA';
-      const servicioTxt = p.servicio==='delivery' ? 'DELIVERY' : (p.servicio==='llevar' ? 'PARA LLEVAR' : 'SALÓN');
-      const esPagado = (p.pago === 'pagado');
-      const metodoTxt = p.metodo ? ` · ${String(p.metodo).toUpperCase()}` : '';
-      const estadoTxt = esPagado ? `PAGADO${metodoTxt}` : 'POR PAGAR';
-      const itemsHTML = (p.items||[]).map(it => {
-        const dets = itemDetalles(it).map(d=>`<div class="d">• ${d}</div>`).join('');
-        const lineaPrecio = (tipo==='cliente') ? `<span>S/ ${Number(it.precio||0).toFixed(2)}</span>` : '';
-        return `<div class="it">
-          <div class="row1"><span>${it.nombre}</span>${lineaPrecio}</div>${dets}
-        </div>`;
-      }).join('');
-      const envioHTML = (p.servicio==='delivery' && Number(p.envio||0)>0 && tipo==='cliente')
-        ? `<div class="totline"><b>Envío</b><b>S/ ${Number(p.envio||0).toFixed(2)}</b></div>` : '';
-      const totCliente = (tipo==='cliente')
-        ? `<div class="tot">${envioHTML}
-             <div class="totline grand"><b>TOTAL</b><b>S/ ${Number((p.total||0)+Number(p.envio||0)).toFixed(2)}</b></div>
-           </div>` : '';
-      const contacto = [
-        p.telefono?`📞 ${p.telefono}`:null,
-        (p.servicio==='salon'&&p.mesa)?`Mesa ${p.mesa}`:null,
-        (p.servicio==='delivery'&&p.direccion)?`📍 ${p.direccion}`:null,
-      ].filter(Boolean).join(' · ');
-      return `<!doctype html><html><head><meta charset="utf-8"/>
-        <style>
-          @page { size: ${ancho} auto; margin: 0; }
-          body { font: 12px monospace; color:#000; margin:0; width:${ancho}; text-align:left; }
-          .center{text-align:center}
-          .row1{display:flex;justify-content:space-between}
-          .it{margin:6px 0}
-          .d{color:#333}
-          .hr{margin:6px 0;border-top:1px dashed #000}
-          .tot{margin-top:6px}
-          .totline{display:flex;justify-content:space-between}
-          .grand{font-size:14px}
-          .status{margin:10px 0 4px 0; padding:8px 6px; text-align:center; font-weight:900; border:2px dashed #000; font-size:18px}
-          .ok{border-style:solid;}
-        </style>
-      </head><body>
-        <div class="center"><div><b>VILLA GRILL</b></div><div>${titulo}</div></div>
-        <div class="hr"></div>
-        <div><b>Cliente:</b> ${p.cliente||'—'}</div>
-        ${contacto?`<div>${contacto}</div>`:''}
-        <div><b>Servicio:</b> ${servicioTxt}</div>
-        <div><b>Pedido:</b> ${key}</div>
-        <div><b>Fecha:</b> ${fecha}</div>
-        <div class="hr"></div>
-        ${itemsHTML}
-        <div class="hr"></div>
-        ${totCliente}
-        <div class="status ${esPagado?'ok':''}">${estadoTxt}</div>
-        <div class="center">¡Gracias!</div>
-        <script>window.onload=()=>{window.print(); setTimeout(()=>window.close(),300);};<\/script>
-      </body></html>`;
-    }
+
+function ticketHTML(key, p, tipo='cocina'){
+  const PAPER_MM = 80;         // ancho físico del rollo
+  const SAFE_MM  = 74;         // ancho útil seguro
+  const fecha = new Date(p.ts||Date.now()).toLocaleString();
+  const titulo = (tipo==='cliente')? 'COMPROBANTE CLIENTE' : 'TICKET COCINA';
+  const servicioTxt = p.servicio==='delivery' ? 'DELIVERY' : (p.servicio==='llevar' ? 'PARA LLEVAR' : 'SALÓN');
+
+  const esPagado = (p.pago === 'pagado');
+  const metodoTxt = p.metodo ? ` · ${String(p.metodo).toUpperCase()}` : '';
+  const estadoTxt = esPagado ? `PAGADO${metodoTxt}` : 'POR PAGAR';
+
+  const itemsHTML = (p.items||[]).map(it => {
+    const partes=[];
+    if ((it.cremas && it.cremas.length) || it.detCremas)
+      partes.push(`Cremas: ${it.cremas?.join(', ')||'—'}${it.detCremas?` (${it.detCremas})`:''}`);
+    if (it.papas || it.detPapas)
+      partes.push(`Papas: ${it.papas||'—'}${it.detPapas?` (${it.detPapas})`:''}`);
+    if (it.ensalada || it.detEnsalada)
+      partes.push(`Ensalada: ${it.ensalada||'—'}${it.detEnsalada?` (${it.detEnsalada})`:''}`);
+
+    const dets = partes.map(d=>`<div class="d">• ${d}</div>`).join('');
+    const lineaPrecio = (tipo==='cliente')
+      ? `<span>S/ ${Number(it.precio||0).toFixed(2)}</span>`  // 👈 aquí corregido
+      : '';
+    return `<div class="it">
+      <div class="row1"><span class="itemName">${it.nombre}</span>${lineaPrecio}</div>
+      ${dets}
+    </div>`;
+  }).join('');
+
+  const envioHTML = (p.servicio==='delivery' && Number(p.envio||0)>0 && tipo==='cliente')
+    ? `<div class="totline"><b>Envío</b><b>S/ ${Number(p.envio||0).toFixed(2)}</b></div>` // 👈 aquí también
+    : '';
+
+  const totCliente = (tipo==='cliente')
+    ? `<div class="tot">
+         ${envioHTML}
+         <div class="totline grand"><b>TOTAL</b><b>S/ ${Number((p.total||0)+Number(p.envio||0)).toFixed(2)}</b></div> <!-- 👈 aquí también -->
+       </div>`
+    : '';
+
+  const contacto = [
+    p.telefono?`📞 ${p.telefono}`:null,
+    (p.servicio==='salon'&&p.mesa)?`Mesa ${p.mesa}`:null,
+    (p.servicio==='delivery'&&p.direccion)?`📍 ${p.direccion}`:null,
+  ].filter(Boolean).join(' · ');
+
+  return `<!doctype html><html><head><meta charset="utf-8"/>
+    <style>
+      @page { size: ${PAPER_MM}mm auto; margin: 0; }
+      body { margin:0; padding:0; }
+      .ticket{
+        width:${SAFE_MM}mm;
+        padding:0 2mm;
+        font: 12px monospace;
+        color:#000;
+        text-align:left;
+        box-sizing:border-box;
+      }
+      .center{text-align:center}
+      .row1{display:flex;justify-content:space-between;gap:6px}
+      .itemName{font-weight:900;font-size:14px;max-width:calc(100% - 60px);word-break:break-word}
+      .it{margin:6px 0}
+      .d{color:#333}
+      .hr{margin:6px 0;border-top:1px dashed #000}
+      .tot{margin-top:6px}
+      .totline{display:flex;justify-content:space-between}
+      .grand{font-size:14px}
+      .status{
+        margin:10px 0;
+        padding:6px;
+        text-align:center;
+        font-weight:900;
+        border:2px dashed #000;
+        font-size:16px;
+      }
+      .ok{border-style:solid;}
+    </style>
+  </head><body>
+    <div class="ticket">
+      <div class="center"><div><b>VILLA GRILL</b></div>
+      <div>${titulo}</div></div>
+      <div class="hr"></div>
+      <div><b>Cliente:</b> ${p.cliente||'—'}</div>
+      ${contacto?`<div>${contacto}</div>`:''}
+      <div><b>Servicio:</b> ${servicioTxt}</div>
+      <div><b>Pedido:</b> ${key}</div>
+      <div><b>Fecha:</b> ${fecha}</div>
+      <div class="hr"></div>
+      ${itemsHTML}
+      <div class="hr"></div>
+      ${totCliente}
+      <div class="status ${esPagado?'ok':''}">${estadoTxt}</div>
+      <div class="center">¡Gracias!</div>
+    </div>
+    <script>window.onload=()=>{window.print();setTimeout(()=>window.close(),300);};<\/script>
+  </body></html>`;
+}
+
+
+
     function printPedido(key, p, tipo='cocina'){
       const w = window.open('', '_blank', 'width=400,height=700');
       if (!w) { alert('Bloqueador de popups: habilita ventanas emergentes para imprimir.'); return; }
