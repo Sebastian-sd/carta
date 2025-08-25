@@ -15,7 +15,7 @@
     .card{background:linear-gradient(180deg,#0e1628,#0b1220);border:1px solid var(--border);border-radius:16px;box-shadow:0 10px 24px #00000055}
     .section{padding:12px}
     .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-    .toolbar input[type="search"], .toolbar input[type="text"], select{border:1px solid var(--border);background:#0b1220;color:#e5e7eb;border-radius:12px;padding:10px 12px;outline:none}
+    .toolbar input[type="search"], .toolbar input[type="text"], select{border:1px solid var(--border);background:#0b1220;color:var(--text);border-radius:12px;padding:10px 12px;outline:none}
     .badge{padding:4px 10px;border:1px solid var(--border);border-radius:999px;color:#a5b4fc;background:#0b1220}
     .badge.efectivo{background:#065f46;color:#bbf7d0;border-color:#065f46}
     .badge.yape{background:#4c1d95;color:#e9d5ff;border-color:#4c1d95}
@@ -32,7 +32,6 @@
     small.muted{color:var(--muted)}
     #registro{max-height:300px;overflow:auto;margin-top:16px;padding:6px;border:1px solid var(--border);border-radius:10px;background:#0e1628}
     #registro .pedido{border-bottom:1px solid #1f2937;padding:6px 0}
-    /* Modal móvil con scroll */
     .modal{position:fixed;inset:0;background:#0009;display:none;align-items:center;justify-content:center;padding:16px;overscroll-behavior:contain}
     .modal.show{display:flex}
     .modal .box{position:relative;display:flex;flex-direction:column;width:min(700px,100%);max-height:90dvh;background:#0e1628;border:1px solid var(--border);border-radius:16px;padding:14px;box-shadow:0 20px 60px #000a}
@@ -80,8 +79,8 @@
       <h2>Carrito</h2>
       <div id="carritoVacio" class="row"><small class="muted">Aún no hay productos. Agrega de la carta →</small></div>
       <div id="carrito"></div>
-      
-      <!-- BLOQUE TOTAL + DATOS CLIENTE/SERVICIO -->
+
+      <!-- DATOS CLIENTE/SERVICIO -->
       <div class="total" style="flex-direction:column; align-items:stretch; gap:8px">
         <div class="row" style="gap:8px">
           <input id="cliente" type="text" placeholder="Nombre del cliente" style="flex:1" />
@@ -306,7 +305,7 @@
   document.getElementById('cerrarModal').onclick=()=>document.getElementById('modal').classList.remove('show');
   document.getElementById('modal').addEventListener('click',e=>{ if(e.target.id==='modal') e.currentTarget.classList.remove('show'); });
 
-  // ==== NUEVOS ELEMENTOS DE SERVICIO/CONTACTO ====
+  // ==== SERVICIO/CONTACTO (UI condicional) ====
   const telEl = document.getElementById('telefono');
   const servicioEl = document.getElementById('servicio');
   const mesaWrap = document.getElementById('mesaWrap');
@@ -353,16 +352,16 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import { getDatabase, ref, push, onChildAdded, onChildChanged, update, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyC3w6KUZi0bKdSMP2f2M3ele8dLtCGpVLk",
-  authDomain: "parrillas-66b0e.firebaseapp.com",
-  databaseURL: "https://parrillas-66b0e-default-rtdb.firebaseio.com",
-  projectId: "parrillas-66b0e",
-  storageBucket: "parrillas-66b0e.firebasestorage.app",
-  messagingSenderId: "520361790818",
-  appId: "1:520361790818:web:36b65573eabde389c9f03b",
-  measurementId: "G-79700DWFFW"
-};
+  const firebaseConfig = {
+    apiKey: "AIzaSyC3w6KUZi0bKdSMP2f2M3ele8dLtCGpVLk",
+    authDomain: "parrillas-66b0e.firebaseapp.com",
+    databaseURL: "https://parrillas-66b0e-default-rtdb.firebaseio.com",
+    projectId: "parrillas-66b0e",
+    storageBucket: "parrillas-66b0e.firebasestorage.app",
+    messagingSenderId: "520361790818",
+    appId: "1:520361790818:web:36b65573eabde389c9f03b",
+    measurementId: "G-79700DWFFW"
+  };
 
   let db=null;
   try{
@@ -379,7 +378,7 @@ const firebaseConfig = {
     if ((i.cremas && i.cremas.length) || i.detCremas) partes.push(`Cremas: ${i.cremas?.join(', ') || '—'}${i.detCremas?` (Det.: ${i.detCremas})`:''}`);
     if (i.papas || i.detPapas) partes.push(`Papas: ${i.papas || '—'}${i.detPapas?` (Det.: ${i.detPapas})`:''}`);
     if (i.ensalada || i.detEnsalada) partes.push(`Ensalada: ${i.ensalada || '—'}${i.detEnsalada?` (Det.: ${i.detEnsalada})`:''}`);
-    return `<div class="it"><strong>${i.nombre}</strong>${partes.length?`<br><small class=\"muted\">• ${partes.join(' · ')}</small>`:''}</div>`;
+    return `<div class="it"><strong>${i.nombre}</strong>${partes.length?`<br><small class="muted">• ${partes.join(' · ')}</small>`:''}</div>`;
   }
 
   if (db) {
@@ -390,7 +389,7 @@ const firebaseConfig = {
       pintarMenu();
     });
 
-    // Enviar pedido (siempre pendiente)
+    // Enviar pedido (pendiente por defecto)
     enviarBtn.onclick=async()=>{
       if(cart.length===0){alert('Agrega productos');return;}
 
@@ -478,6 +477,8 @@ const firebaseConfig = {
               ${p.pago==='pagado'?'Marcar pendiente':'Marcar pagado'}
             </button>
             <button class="ghost" data-act="edit" data-key="${key}" style="margin-left:8px">Editar</button>
+            <button class="ghost" data-act="print-cocina" data-key="${key}" style="margin-left:8px">Imprimir cocina</button>
+            <button class="ghost" data-act="print-cliente" data-key="${key}" style="margin-left:8px">Imprimir cliente</button>
           </div>
         </div>`;
       div.querySelector('button[data-act="toggle"]').onclick = async ()=>{
@@ -489,6 +490,9 @@ const firebaseConfig = {
       };
       // Abrir modal de edición
       div.querySelector('button[data-act="edit"]').onclick = ()=> openEditModal(key, p);
+      // Imprimir tickets
+      div.querySelector('button[data-act="print-cocina"]').onclick = ()=> printPedido(key, p, 'cocina');
+      div.querySelector('button[data-act="print-cliente"]').onclick = ()=> printPedido(key, p, 'cliente');
     }
 
     onChildAdded(ref(db,'pedidos'), snap => {
@@ -535,10 +539,9 @@ const firebaseConfig = {
   const editEnvio = document.getElementById('editEnvio');
   const editItemsEl = document.getElementById('editItems');
   let editKey = null; let editItems = [];
-  // Cambios de servicio dentro del modal de edición
-  editServicio.onchange = syncEditServicioUI;
+  editServicio.onchange = syncEditServicioUI_Edit;
 
-  function syncEditServicioUI(){
+  function syncEditServicioUI_Edit(){
     const v = editServicio.value;
     editMesaWrap.style.display = (v === 'salon') ? 'flex' : 'none';
     editDirWrap.style.display  = (v === 'delivery') ? 'flex' : 'none';
@@ -578,7 +581,7 @@ const firebaseConfig = {
     editDireccion.value = p.direccion || '';
     editEnvio.value = (p.envio!=null? p.envio : '').toString();
     editItems = Array.isArray(p.items) ? JSON.parse(JSON.stringify(p.items)) : [];
-    syncEditServicioUI();
+    syncEditServicioUI_Edit();
     renderEditItems();
     editModal.classList.add('show');
   }
@@ -601,7 +604,7 @@ const firebaseConfig = {
   document.getElementById('saveEdit').onclick = async () => {
     if (!editKey) return;
     const snapRef = ref(db, `pedidos/${editKey}`);
-    // Tomar valores nuevos
+    // Nuevos valores
     const cliente = editCliente.value.trim() || null;
     const telefono = editTelefono.value.trim() || null;
     const servicio = editServicio.value || 'salon';
@@ -609,20 +612,18 @@ const firebaseConfig = {
     const direccion = (servicio==='delivery') ? (editDireccion.value.trim() || null) : null;
     const envio = (servicio==='delivery') ? Number(editEnvio.value||0) : 0;
 
-    // Recalcular total por items (mantenemos envío separado)
+    // Recalcular total (solo ítems)
     const total = editItems.reduce((a,b)=>a+Number(b.precio||0), 0);
 
     try {
-      // Obtener estado anterior para dif (usamos onValue una sola vez)
+      // Estado anterior (para historial)
       let anterior = null;
       await new Promise((resolve) => onValue(snapRef, s=>{ anterior = s.val(); resolve(); }, { onlyOnce:true }));
 
       const nuevo = { ...anterior, cliente, telefono, servicio, mesa, direccion, envio, items: editItems, total };
       const resumen = resumirCambios(anterior||{}, nuevo);
 
-      // Escribir cambios
       await update(snapRef, { cliente, telefono, servicio, mesa, direccion, envio, items: editItems, total });
-      // Historial (append)
       await push(ref(db, `pedidos/${editKey}/historial`), { ts: Date.now(), resumen });
 
       closeEdit();
@@ -631,6 +632,104 @@ const firebaseConfig = {
       alert('No se pudo actualizar: ' + (e?.message||e));
     }
   };
+
+  /* ======= Impresión por navegador (80mm/58mm) ======= */
+  // Cambia a 58 si tu rollo es de 58mm
+  const TICKET_WIDTH_MM = 80;
+
+  function formatMoney(n){ return Number(n||0).toFixed(2); }
+  function itemDetalles(it){
+    const partes=[];
+    if ((it.cremas && it.cremas.length) || it.detCremas) partes.push(`Cremas: ${it.cremas?.join(', ') || '—'}${it.detCremas?` (Det.: ${it.detCremas})`:''}`);
+    if (it.papas || it.detPapas) partes.push(`Papas: ${it.papas || '—'}${it.detPapas?` (Det.: ${it.detPapas})`:''}`);
+    if (it.ensalada || it.detEnsalada) partes.push(`Ensalada: ${it.ensalada || '—'}${it.detEnsalada?` (Det.: ${it.detEnsalada})`:''}`);
+    return partes;
+  }
+
+  function ticketHTML(key, p, tipo='cocina'){
+  const ancho = `${TICKET_WIDTH_MM}mm`;
+  const fecha = new Date(p.ts||Date.now()).toLocaleString();
+  const titulo = (tipo==='cliente')? 'COMPROBANTE CLIENTE' : 'TICKET COCINA';
+  const servicioTxt = p.servicio==='delivery' ? 'DELIVERY' : (p.servicio==='llevar' ? 'PARA LLEVAR' : 'SALÓN');
+
+  // === Estado de pago grande (abajo) ===
+  const esPagado = (p.pago === 'pagado');
+  const metodoTxt = p.metodo ? ` · ${String(p.metodo).toUpperCase()}` : '';
+  const estadoTxt = esPagado ? `PAGADO${metodoTxt}` : 'POR PAGAR';
+
+  const itemsHTML = (p.items||[]).map(it => {
+    const partes=[];
+    if ((it.cremas && it.cremas.length) || it.detCremas) partes.push(`Cremas: ${it.cremas?.join(', ') || '—'}${it.detCremas?` (Det.: ${it.detCremas})`:''}`);
+    if (it.papas || it.detPapas) partes.push(`Papas: ${it.papas || '—'}${it.detPapas?` (Det.: ${it.detPapas})`:''}`);
+    if (it.ensalada || it.detEnsalada) partes.push(`Ensalada: ${it.ensalada || '—'}${it.detEnsalada?` (Det.: ${it.detEnsalada})`:''}`);
+
+    const dets = partes.map(d=>`<div class="d">• ${d}</div>`).join('');
+    const lineaPrecio = (tipo==='cliente') ? `<span>S/ ${Number(it.precio||0).toFixed(2)}</span>` : '';
+    return `<div class="it">
+      <div class="row1"><span>${it.nombre}</span>${lineaPrecio}</div>
+      ${dets}
+    </div>`;
+  }).join('');
+
+  const envioHTML = (p.servicio==='delivery' && Number(p.envio||0)>0 && tipo==='cliente')
+    ? `<div class="totline"><b>Envío</b><b>S/ ${Number(p.envio||0).toFixed(2)}</b></div>` : '';
+
+  const totCliente = (tipo==='cliente')
+    ? `<div class="tot">
+         ${envioHTML}
+         <div class="totline grand"><b>TOTAL</b><b>S/ ${Number((p.total||0)+Number(p.envio||0)).toFixed(2)}</b></div>
+       </div>`
+    : '';
+
+  const contacto = [
+    p.telefono?`📞 ${p.telefono}`:null,
+    (p.servicio==='salon'&&p.mesa)?`Mesa ${p.mesa}`:null,
+    (p.servicio==='delivery'&&p.direccion)?`📍 ${p.direccion}`:null,
+  ].filter(Boolean).join(' · ');
+
+  return `<!doctype html><html><head><meta charset="utf-8"/>
+    <style>
+      @page { size: ${ancho} auto; margin: 0; }
+      body { font: 12px monospace; color:#000; margin:0; width:${ancho}; text-align:left; }
+      .center{text-align:center}
+      .row1{display:flex;justify-content:space-between}
+      .it{margin:6px 0}
+      .d{color:#333}
+      .hr{margin:6px 0;border-top:1px dashed #000}
+      .tot{margin-top:6px}
+      .totline{display:flex;justify-content:space-between}
+      .grand{font-size:14px}
+      /* Estado de pago grande */
+      .status{margin:10px 0 4px 0; padding:8px 6px; text-align:center; font-weight:900; 
+              border:2px dashed #000; font-size:18px; }
+      .ok{border-style:solid;}
+    </style>
+  </head><body>
+    <div class="center"><div><b>VILLA GRILL</b></div>
+    <div>${titulo}</div></div>
+    <div class="hr"></div>
+    <div><b>Cliente:</b> ${p.cliente||'—'}</div>
+    ${contacto?`<div>${contacto}</div>`:''}
+    <div><b>Servicio:</b> ${servicioTxt}</div>
+    <div><b>Pedido:</b> ${key}</div>
+    <div><b>Fecha:</b> ${fecha}</div>
+    <div class="hr"></div>
+    ${itemsHTML}
+    <div class="hr"></div>
+    ${totCliente}
+    <div class="status ${esPagado?'ok':''}">${estadoTxt}</div>
+    <div class="center">¡Gracias!</div>
+    <script>window.onload=()=>{window.print(); setTimeout(()=>window.close(), 300);};<\/script>
+  </body></html>`;
+}
+
+  function printPedido(key, p, tipo='cocina'){
+    const w = window.open('', '_blank', 'width=400,height=700');
+    if (!w) { alert('Bloqueador de popups: habilita ventanas emergentes para imprimir.'); return; }
+    w.document.open();
+    w.document.write(ticketHTML(key, p, tipo));
+    w.document.close();
+  }
 </script>
 </body>
 </html>
