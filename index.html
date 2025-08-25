@@ -114,6 +114,18 @@
 <!-- Resumen del día -->
 <section class="container card section" style="margin-top:12px">
   <h2 style="margin:0 0 8px 0">Resumen de ventas (hoy)</h2>
+<section class="container card section" style="margin-top:12px">
+  <h2 style="margin:0 0 8px 0">
+    Resumen de ventas (hoy)
+  </h2>
+
+  <!-- 👉 botón para generar PDF -->
+  <div class="row" style="justify-content:flex-end;margin-bottom:8px">
+    <button id="btnReporte" class="ghost">Descargar reporte (PDF)</button>
+  </div>
+  <!-- /botón -->
+  
+  <div class="list" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px">
   <div class="list" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px">
     <div class="item"><strong>Pedidos</strong><div><span id="resPedidos">0</span></div></div>
     <div class="item"><strong>Total pagado</strong><div>S/ <span id="resPagado">0.00</span></div></div>
@@ -382,6 +394,135 @@
   }
 
   if (db) {
+
+	  function buildReporteData() {
+    const data = {
+      pedidos: 0,
+      pagado: 0,
+      pendiente: 0,
+      efectivo: 0,
+      yape: 0,
+      porServicio: { salon: 0, llevar: 0, delivery: 0 },
+      productos: new Map(), // nombre -> { qty, total }
+    };
+    pedidosHoy.forEach(p => {
+      data.pedidos++;
+      // totales pagado/pendiente
+      if (p.pago === 'pagado') data.pagado += Number(p.total||0);
+      else data.pendiente += Number(p.total||0);
+      // método
+      if (p.pago === 'pagado' && p.metodo === 'efectivo') data.efectivo += Number(p.total||0);
+      if (p.pago === 'pagado' && p.metodo === 'yape')     data.yape     += Number(p.total||0);
+      // servicio
+      if (p.servicio && data.porServicio[p.servicio] != null) data.porServicio[p.servicio]++;
+
+      // productos
+      (p.items||[]).forEach(it => {
+        const k = it.nombre || '—';
+        const prev = data.productos.get(k) || { qty: 0, total: 0 };
+        prev.qty += 1;
+        prev.total += Number(it.precio||0);
+        data.productos.set(k, prev);
+      });
+    });
+    return data;
+  }
+
+  // HTML imprimible A4
+  function reporteHTML() {
+    const f = new Date();
+    const fechaCab = f.toLocaleDateString() + ' ' + f.toLocaleTimeString();
+    const d = buildReporteData();
+
+    // Productos ordenados por cantidad desc
+    const rows = [...d.productos.entries()]
+      .sort((a,b)=> b[1].qty - a[1].qty)
+      .map(([name, v]) => `
+        <tr>
+          <td>${name}</td>
+          <td style="text-align:right">${v.qty}</td>
+          <td style="text-align:right">S/ ${v.total.toFixed(2)}</td>
+        </tr>
+      `).join('') || '<tr><td colspan="3" style="text-align:center;color:#666">— Sin ventas —</td></tr>';
+
+    return `<!doctype html><html><head><meta charset="utf-8"/>
+      <title>Reporte diario</title>
+      <style>
+        @page { size: A4 portrait; margin: 14mm; }
+        body { font-family: ui-sans-serif,system-ui,Segoe UI,Roboto,Arial; color:#111; }
+        h1 { margin:0 0 4px 0; font-size:18px }
+        h2 { margin:10px 0 6px 0; font-size:15px }
+        .muted{ color:#666; font-size:12px }
+        .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:8px; }
+        .card { border:1px solid #ddd; border-radius:10px; padding:10px; }
+        table { width:100%; border-collapse:collapse; margin-top:6px }
+        th, td { border-bottom:1px solid #eee; padding:6px 8px; font-size:13px }
+        th { background:#f7f7f7; text-align:left }
+        .right { text-align:right }
+        .tot { font-weight:700 }
+        .sep { height:1px; background:#ddd; margin:10px 0 }
+        .badge { display:inline-block; padding:2px 8px; border:1px solid #ccc; border-radius:999px; font-size:12px; }
+      </style>
+    </head><body>
+      <h1>VILLA GRILL · Reporte diario</h1>
+      <div class="muted">Generado: ${fechaCab}</div>
+
+      <div class="grid" style="margin-top:10px">
+        <div class="card">
+          <h2>Resumen</h2>
+          <table>
+            <tr><td>Pedidos</td><td class="right">${d.pedidos}</td></tr>
+            <tr><td>Pagado</td><td class="right">S/ ${d.pagado.toFixed(2)}</td></tr>
+            <tr><td>Pendiente</td><td class="right">S/ ${d.pendiente.toFixed(2)}</td></tr>
+            <tr class="tot"><td>Total del día</td><td class="right">S/ ${(d.pagado + d.pendiente).toFixed(2)}</td></tr>
+          </table>
+        </div>
+
+        <div class="card">
+          <h2>Por método (pagado)</h2>
+          <table>
+            <tr><td>Efectivo</td><td class="right">S/ ${d.efectivo.toFixed(2)}</td></tr>
+            <tr><td>Yape</td><td class="right">S/ ${d.yape.toFixed(2)}</td></tr>
+          </table>
+        </div>
+
+        <div class="card">
+          <h2>Por servicio</h2>
+          <table>
+            <tr><td>Salón / mesa</td><td class="right">${d.porServicio.salon}</td></tr>
+            <tr><td>Para llevar</td><td class="right">${d.porServicio.llevar}</td></tr>
+            <tr><td>Delivery</td><td class="right">${d.porServicio.delivery}</td></tr>
+          </table>
+        </div>
+      </div>
+
+      <div class="sep"></div>
+
+      <div class="card">
+        <h2>Productos vendidos (hoy)</h2>
+        <table>
+          <thead>
+            <tr><th>Producto</th><th style="text-align:right">Cant.</th><th style="text-align:right">Importe</th></tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+
+      <script>window.onload=()=>{ window.print(); setTimeout(()=>window.close(), 300); }<\/script>
+    </body></html>`;
+  }
+
+  function abrirReportePDF(){
+    const w = window.open('', '_blank');
+    if(!w){ alert('Habilita ventanas emergentes para descargar el PDF'); return; }
+    w.document.open();
+    w.document.write(reporteHTML());
+    w.document.close();
+  }
+
+  // Click del botón
+  document.getElementById('btnReporte').onclick = abrirReportePDF;
+
     // Cargar carta
     onValue(ref(db,'carta'), snap => {
       const val = snap.val();
