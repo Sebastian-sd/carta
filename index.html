@@ -15,7 +15,7 @@
     .card{background:linear-gradient(180deg,#0e1628,#0b1220);border:1px solid var(--border);border-radius:16px;box-shadow:0 10px 24px #00000055}
     .section{padding:12px}
     .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-    .toolbar input[type="search"], .toolbar input[type="text"], select{border:1px solid var(--border);background:#0b1220;color:var(--text);border-radius:12px;padding:10px 12px;outline:none}
+    .toolbar input[type="search"], .toolbar input[type="text"], select{border:1px solid var(--border);background:#0b1220;color:#e5e7eb;border-radius:12px;padding:10px 12px;outline:none}
     .badge{padding:4px 10px;border:1px solid var(--border);border-radius:999px;color:#a5b4fc;background:#0b1220}
     .badge.efectivo{background:#065f46;color:#bbf7d0;border-color:#065f46}
     .badge.yape{background:#4c1d95;color:#e9d5ff;border-color:#4c1d95}
@@ -80,10 +80,33 @@
       <h2>Carrito</h2>
       <div id="carritoVacio" class="row"><small class="muted">Aún no hay productos. Agrega de la carta →</small></div>
       <div id="carrito"></div>
-      <div class="total">
-        <input id="cliente" type="text" placeholder="Nombre del cliente" style="flex:1;margin-right:8px" />
-        <button id="enviar">Enviar pedido</button>
+      
+      <!-- BLOQUE TOTAL + DATOS CLIENTE/SERVICIO -->
+      <div class="total" style="flex-direction:column; align-items:stretch; gap:8px">
+        <div class="row" style="gap:8px">
+          <input id="cliente" type="text" placeholder="Nombre del cliente" style="flex:1" />
+          <input id="telefono" type="tel" placeholder="Teléfono" inputmode="tel" style="width:160px" />
+        </div>
+        <div class="row" style="gap:8px">
+          <label for="servicio" style="min-width:120px">Servicio:</label>
+          <select id="servicio" style="flex:1">
+            <option value="salon">Salón / Mesa</option>
+            <option value="llevar">Para llevar</option>
+            <option value="delivery">Delivery</option>
+          </select>
+        </div>
+        <div class="row" id="mesaWrap" style="gap:8px; display:none">
+          <input id="mesa" type="text" placeholder="N° de mesa (ej. 5)" style="flex:1" />
+        </div>
+        <div class="row" id="dirWrap" style="gap:8px; display:none">
+          <input id="direccion" type="text" placeholder="Dirección completa" style="flex:2" />
+          <input id="costoEnvio" type="number" step="0.1" min="0" placeholder="Envío S/" style="width:120px" />
+        </div>
+        <div class="row" style="justify-content:flex-end">
+          <button id="enviar">Enviar pedido</button>
+        </div>
       </div>
+
       <small class="muted">Los pedidos se guardan en Firebase Realtime Database.</small>
     </div>
   </aside>
@@ -117,6 +140,43 @@
     <div class="actions">
       <button class="ghost" id="cancelar" type="button">Cancelar</button>
       <button id="guardarPersonalizacion" type="button">Agregar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de edición de pedido -->
+<div id="editModal" class="modal" aria-hidden="true">
+  <div class="box">
+    <button class="close-btn" id="closeEdit" type="button">✕</button>
+    <h3>Editar pedido</h3>
+    <div class="scroll">
+      <div class="row" style="gap:8px; margin-bottom:8px">
+        <input id="editCliente" type="text" placeholder="Nombre del cliente" style="flex:1" />
+        <input id="editTelefono" type="tel" placeholder="Teléfono" inputmode="tel" style="width:160px" />
+      </div>
+      <div class="row" style="gap:8px; margin-bottom:8px">
+        <label for="editServicio" style="min-width:120px">Servicio:</label>
+        <select id="editServicio" style="flex:1">
+          <option value="salon">Salón / Mesa</option>
+          <option value="llevar">Para llevar</option>
+          <option value="delivery">Delivery</option>
+        </select>
+      </div>
+      <div class="row" id="editMesaWrap" style="gap:8px; display:none; margin-bottom:8px">
+        <input id="editMesa" type="text" placeholder="N° de mesa" style="flex:1" />
+      </div>
+      <div class="row" id="editDirWrap" style="gap:8px; display:none; margin-bottom:8px">
+        <input id="editDireccion" type="text" placeholder="Dirección" style="flex:2" />
+        <input id="editEnvio" type="number" step="0.1" min="0" placeholder="Envío S/" style="width:120px" />
+      </div>
+
+      <h4 style="margin:8px 0 4px 0">Ítems</h4>
+      <div id="editItems" class="list" style="grid-template-columns:1fr; gap:8px"></div>
+      <small class="muted">Puedes duplicar o quitar ítems. (Edición detallada se puede hacer quitando y volviendo a agregar desde la carta.)</small>
+    </div>
+    <div class="actions">
+      <button class="ghost" id="cancelEdit" type="button">Cancelar</button>
+      <button id="saveEdit" type="button">Guardar cambios</button>
     </div>
   </div>
 </div>
@@ -246,6 +306,21 @@
   document.getElementById('cerrarModal').onclick=()=>document.getElementById('modal').classList.remove('show');
   document.getElementById('modal').addEventListener('click',e=>{ if(e.target.id==='modal') e.currentTarget.classList.remove('show'); });
 
+  // ==== NUEVOS ELEMENTOS DE SERVICIO/CONTACTO ====
+  const telEl = document.getElementById('telefono');
+  const servicioEl = document.getElementById('servicio');
+  const mesaWrap = document.getElementById('mesaWrap');
+  const dirWrap = document.getElementById('dirWrap');
+  const mesaEl = document.getElementById('mesa');
+  const dirEl = document.getElementById('direccion');
+  const envioEl = document.getElementById('costoEnvio');
+  function syncServicioUI(){
+    const v = servicioEl.value;
+    mesaWrap.style.display = (v === 'salon') ? 'flex' : 'none';
+    dirWrap.style.display  = (v === 'delivery') ? 'flex' : 'none';
+  }
+  servicioEl.onchange = syncServicioUI; syncServicioUI();
+
   function pintarCarrito(){
     carritoEl.innerHTML='';
     carritoVacio.style.display = cart.length ? 'none':'block';
@@ -265,7 +340,6 @@
           <button class="ghost" data-i="${i}" data-act="dup">Duplicar</button>
           <button class="ghost" data-i="${i}" data-act="del" style="margin-left:auto">Eliminar</button>
         </div>`;
-      // Acciones
       div.querySelector('[data-act="dup"]').onclick=()=>{ cart.push({...l, ts:Date.now()}); pintarCarrito(); };
       div.querySelector('[data-act="del"]').onclick=()=>{ cart.splice(i,1); pintarCarrito(); };
       carritoEl.appendChild(div);
@@ -319,11 +393,20 @@ const firebaseConfig = {
     // Enviar pedido (siempre pendiente)
     enviarBtn.onclick=async()=>{
       if(cart.length===0){alert('Agrega productos');return;}
-      const cliente=$('#cliente').value.trim();
+
+      const cliente  = ($('#cliente').value || '').trim() || null;
+      const telefono = (telEl.value || '').trim() || null;
+      const servicio = servicioEl.value || 'salon';
+      const mesa     = (servicio === 'salon')   ? ((mesaEl.value || '').trim() || null) : null;
+      const direccion= (servicio === 'delivery')? ((dirEl.value  || '').trim() || null) : null;
+      const envio    = (servicio === 'delivery')? Number(envioEl.value || 0) : 0;
+
+      if (servicio === 'delivery' && (!telefono || !direccion)) { alert('Para delivery, ingresa teléfono y dirección.'); return; }
+      if (servicio === 'salon' && !mesa) { const ok = confirm('¿Enviar sin número de mesa?'); if (!ok) return; }
+
       const pedido={
-        cliente:cliente||null,
-        pago:'pendiente',
-        metodo:null,
+        cliente, telefono, servicio, mesa, direccion, envio,
+        pago:'pendiente', metodo:null,
         items:cart.slice(),
         total:cart.reduce((a,b)=>a+b.precio,0),
         ts:Date.now()
@@ -331,7 +414,9 @@ const firebaseConfig = {
       try{
         enviarBtn.disabled=true;
         await push(ref(db,'pedidos'),pedido);
-        cart.length=0; pintarCarrito(); $('#cliente').value='';
+        cart.length=0; pintarCarrito();
+        $('#cliente').value=''; telEl.value=''; mesaEl.value=''; dirEl.value=''; envioEl.value='';
+        servicioEl.value='salon'; syncServicioUI();
         alert('✅ Pedido enviado');
       }catch(e){ alert('Error:'+e.message); }
       finally{ enviarBtn.disabled=false; }
@@ -363,13 +448,28 @@ const firebaseConfig = {
       const d = new Date(p.ts);
       const items = (p.items||[]).map(fmtItem).join('<hr class="sep">');
       const pagoTxt = p.pago === 'pagado' ? 'Pagado' : 'Por pagar';
+
+      const servicioBadge =
+        p.servicio === 'delivery' ? '<span class="badge">delivery</span>' :
+        p.servicio === 'llevar'   ? '<span class="badge">llevar</span>' :
+                                    '<span class="badge">salón</span>';
+
+      const lineaContacto = [
+        p.telefono ? `📞 ${p.telefono}` : null,
+        (p.servicio==='salon'   && p.mesa)      ? `Mesa ${p.mesa}` : null,
+        (p.servicio==='delivery'&& p.direccion) ? `📍 ${p.direccion}` : null,
+        (p.servicio==='delivery'&& Number(p.envio||0)>0) ? `Envío S/ ${Number(p.envio).toFixed(2)}` : null,
+      ].filter(Boolean).join(' · ');
+
       if(!div){ div=document.createElement('div'); div.className='pedido'; div.dataset.key=key; registroEl.prepend(div); }
       div.innerHTML = `
         <div class="row" style="justify-content:space-between;align-items:center">
           <div>
             <strong>${p.cliente||'Sin nombre'}</strong>
+            ${servicioBadge}
             <span class="badge ${p.pago==='pagado'?'':'ghost'}">${pagoTxt}</span>
             ${p.metodo?`<span class="badge ${p.metodo}">${p.metodo}</span>`:''}<br>
+            ${lineaContacto?`<small class="muted">${lineaContacto}</small><br>`:''}
             ${items}<br>
             Total: S/ ${Number(p.total||0).toFixed(2)} <small class="muted">${d.toLocaleString()}</small>
           </div>
@@ -377,6 +477,7 @@ const firebaseConfig = {
             <button class="ghost" data-act="toggle" data-key="${key}">
               ${p.pago==='pagado'?'Marcar pendiente':'Marcar pagado'}
             </button>
+            <button class="ghost" data-act="edit" data-key="${key}" style="margin-left:8px">Editar</button>
           </div>
         </div>`;
       div.querySelector('button[data-act="toggle"]').onclick = async ()=>{
@@ -386,6 +487,8 @@ const firebaseConfig = {
           openPayModal(key, p.metodo || 'efectivo');
         }
       };
+      // Abrir modal de edición
+      div.querySelector('button[data-act="edit"]').onclick = ()=> openEditModal(key, p);
     }
 
     onChildAdded(ref(db,'pedidos'), snap => {
@@ -418,6 +521,115 @@ const firebaseConfig = {
     const metodo = payMetodoSel.value;
     try { await update(ref(db, `pedidos/${payKey}`), { pago: 'pagado', metodo }); closePayModal(); }
     catch(e) { alert('No se pudo actualizar: ' + (e?.message||e)); }
+  };
+
+  /* ===== Edición de Pedidos ===== */
+  const editModal = document.getElementById('editModal');
+  const editCliente = document.getElementById('editCliente');
+  const editTelefono = document.getElementById('editTelefono');
+  const editServicio = document.getElementById('editServicio');
+  const editMesaWrap = document.getElementById('editMesaWrap');
+  const editMesa = document.getElementById('editMesa');
+  const editDirWrap = document.getElementById('editDirWrap');
+  const editDireccion = document.getElementById('editDireccion');
+  const editEnvio = document.getElementById('editEnvio');
+  const editItemsEl = document.getElementById('editItems');
+  let editKey = null; let editItems = [];
+  // Cambios de servicio dentro del modal de edición
+  editServicio.onchange = syncEditServicioUI;
+
+  function syncEditServicioUI(){
+    const v = editServicio.value;
+    editMesaWrap.style.display = (v === 'salon') ? 'flex' : 'none';
+    editDirWrap.style.display  = (v === 'delivery') ? 'flex' : 'none';
+  }
+
+  function renderEditItems(){
+    if (!Array.isArray(editItems)) editItems = [];
+    editItemsEl.innerHTML = '';
+    editItems.forEach((it, idx) => {
+      const div = document.createElement('div');
+      div.className = 'item';
+      const partes=[];
+      if ((it.cremas && it.cremas.length) || it.detCremas) partes.push(`Cremas: ${it.cremas?.join(', ') || '—'}${it.detCremas?` (Det.: ${it.detCremas})`:''}`);
+      if (it.papas || it.detPapas) partes.push(`Papas: ${it.papas || '—'}${it.detPapas?` (Det.: ${it.detPapas})`:''}`);
+      if (it.ensalada || it.detEnsalada) partes.push(`Ensalada: ${it.ensalada || '—'}${it.detEnsalada?` (Det.: ${it.detEnsalada})`:''}`);
+      div.innerHTML = `
+        <div class="row" style="justify-content:space-between">
+          <strong>${it.nombre}</strong><span class="price">S/ ${Number(it.precio||0).toFixed(2)}</span>
+        </div>
+        ${partes.length?`<small class="muted">• ${partes.join(' · ')}</small>`:''}
+        <div class="row">
+          <button class="ghost" data-act="dup" data-i="${idx}">Duplicar</button>
+          <button class="ghost" data-act="del" data-i="${idx}" style="margin-left:auto">Quitar</button>
+        </div>`;
+      div.querySelector('[data-act="dup"]').onclick = () => { editItems.splice(idx+1,0,{...it, ts:Date.now()}); renderEditItems(); };
+      div.querySelector('[data-act="del"]').onclick = () => { editItems.splice(idx,1); renderEditItems(); };
+      editItemsEl.appendChild(div);
+    });
+  }
+
+  function openEditModal(key, p){
+    editKey = key;
+    editCliente.value = p.cliente || '';
+    editTelefono.value = p.telefono || '';
+    editServicio.value = p.servicio || 'salon';
+    editMesa.value = p.mesa || '';
+    editDireccion.value = p.direccion || '';
+    editEnvio.value = (p.envio!=null? p.envio : '').toString();
+    editItems = Array.isArray(p.items) ? JSON.parse(JSON.stringify(p.items)) : [];
+    syncEditServicioUI();
+    renderEditItems();
+    editModal.classList.add('show');
+  }
+  function closeEdit(){ editModal.classList.remove('show'); editKey = null; editItems = []; }
+  document.getElementById('closeEdit').onclick = closeEdit;
+  document.getElementById('cancelEdit').onclick = closeEdit;
+  editModal.addEventListener('click', e => { if(e.target.id==='editModal') closeEdit(); });
+
+  function resumirCambios(ant, neu){
+    const cambios=[];
+    const campos = ['cliente','telefono','servicio','mesa','direccion','envio'];
+    campos.forEach(k=>{ if ((ant?.[k]??null) !== (neu?.[k]??null)) cambios.push(`${k}: "${ant?.[k]??''}" → "${neu?.[k]??''}"`); });
+    const lenA = (ant.items||[]).length, lenN = (neu.items||[]).length;
+    if (lenA !== lenN) cambios.push(`ítems: ${lenA} → ${lenN}`);
+    const totA = Number(ant.total||0).toFixed(2), totN = Number(neu.total||0).toFixed(2);
+    if (totA !== totN) cambios.push(`total: S/ ${totA} → S/ ${totN}`);
+    return cambios.join(' | ');
+  }
+
+  document.getElementById('saveEdit').onclick = async () => {
+    if (!editKey) return;
+    const snapRef = ref(db, `pedidos/${editKey}`);
+    // Tomar valores nuevos
+    const cliente = editCliente.value.trim() || null;
+    const telefono = editTelefono.value.trim() || null;
+    const servicio = editServicio.value || 'salon';
+    const mesa = (servicio==='salon') ? (editMesa.value.trim() || null) : null;
+    const direccion = (servicio==='delivery') ? (editDireccion.value.trim() || null) : null;
+    const envio = (servicio==='delivery') ? Number(editEnvio.value||0) : 0;
+
+    // Recalcular total por items (mantenemos envío separado)
+    const total = editItems.reduce((a,b)=>a+Number(b.precio||0), 0);
+
+    try {
+      // Obtener estado anterior para dif (usamos onValue una sola vez)
+      let anterior = null;
+      await new Promise((resolve) => onValue(snapRef, s=>{ anterior = s.val(); resolve(); }, { onlyOnce:true }));
+
+      const nuevo = { ...anterior, cliente, telefono, servicio, mesa, direccion, envio, items: editItems, total };
+      const resumen = resumirCambios(anterior||{}, nuevo);
+
+      // Escribir cambios
+      await update(snapRef, { cliente, telefono, servicio, mesa, direccion, envio, items: editItems, total });
+      // Historial (append)
+      await push(ref(db, `pedidos/${editKey}/historial`), { ts: Date.now(), resumen });
+
+      closeEdit();
+      alert('✅ Pedido actualizado');
+    } catch(e){
+      alert('No se pudo actualizar: ' + (e?.message||e));
+    }
   };
 </script>
 </body>
